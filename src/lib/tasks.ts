@@ -1,13 +1,14 @@
 import path from "path";
 import fs from "fs";
-import type { TaskConfig, TaskWithDigests, Category } from "./types";
+import type { TaskConfig, TaskWithDigests, TasksFile, Category } from "./types";
 import { scanFolderForDigests } from "./digests";
 
 const CONFIG_PATH = path.resolve(process.cwd(), "config", "tasks.json");
 
 export function loadTaskConfigs(): TaskConfig[] {
   const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
-  return JSON.parse(raw) as TaskConfig[];
+  const parsed = JSON.parse(raw) as TasksFile;
+  return parsed.tasks;
 }
 
 export async function loadTasksWithDigests(): Promise<TaskWithDigests[]> {

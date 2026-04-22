@@ -99,7 +99,6 @@ export async function getAllDigests(categoryFilter?: Category): Promise<DigestFi
 }
 
 function matchesPattern(name: string, pattern: string): boolean {
-  // Simple glob: prefix*suffix (e.g. "AIN-*.md")
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
   return new RegExp(`^${escaped}$`).test(name);
 }
@@ -133,10 +132,16 @@ export async function getDigestContent(id: string): Promise<DigestWithContent | 
 
   const fileName = path.basename(filePath);
   const folder = path.dirname(filePath);
+  const fileNameLower = fileName.toLowerCase();
 
-  const matchedTask = configs.find(
-    (t) => t.outputFolder && path.resolve(t.outputFolder) === folder
-  );
+  // Match by outputFolder first, then fall back to filePrefix
+  const matchedTask =
+    configs.find((t) => t.outputFolder && path.resolve(t.outputFolder) === folder) ??
+    configs.find(
+      (t) =>
+        t.filePrefix &&
+        fileNameLower.startsWith(t.filePrefix.toLowerCase() + "-")
+    );
 
   return {
     id,
