@@ -67,10 +67,6 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
             color: "var(--text-muted)",
             border: "1px solid var(--border)",
           }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)")
-          }
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
         >
           ✕
         </button>
@@ -125,16 +121,12 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
           <button
             onClick={handleRunNow}
             disabled={isPending}
-            className="w-full py-2 px-3 rounded-md text-xs font-medium transition-colors"
+            className="w-full py-2 px-3 rounded-md text-xs font-medium"
             style={{
               backgroundColor: "var(--accent)",
               color: "#fff",
               opacity: isPending ? 0.6 : 1,
             }}
-            onMouseEnter={(e) =>
-              !isPending && (e.currentTarget.style.backgroundColor = "var(--accent-hover)")
-            }
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--accent)")}
           >
             {isPending ? "Running…" : "Run Now"}
           </button>
@@ -159,17 +151,11 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
                 <button
                   key={d.id}
                   onClick={() => setOpenDigestId(d.id)}
-                  className="w-full text-left rounded-lg p-2.5 flex flex-col gap-0.5 transition-colors"
+                  className="w-full text-left rounded-lg p-2.5 flex flex-col gap-0.5"
                   style={{
                     backgroundColor: "var(--surface-raised)",
                     border: "1px solid var(--border-subtle)",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.borderColor = "var(--border-subtle)")
-                  }
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-medium truncate" style={{ color: "#fff" }}>
@@ -200,14 +186,15 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   );
 
   return (
-    <div
-      className="fixed inset-0 z-40"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-    >
-      {/* Mobile: slide up from bottom */}
+    <>
+      {/* Mobile: backdrop + bottom sheet — each a separate fixed root, no nesting */}
       <div
-        className="md:hidden fixed bottom-0 left-0 right-0 flex flex-col rounded-t-xl overflow-hidden"
+        className="md:hidden fixed inset-0 z-40"
+        style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+        onClick={onClose}
+      />
+      <div
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex flex-col rounded-t-xl overflow-hidden"
         style={{
           maxHeight: "82vh",
           backgroundColor: "var(--surface)",
@@ -215,7 +202,6 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
           boxShadow: "0 -16px 40px rgba(0,0,0,0.4)",
         }}
       >
-        {/* Drag handle */}
         <div className="flex justify-center pt-2 pb-1 shrink-0">
           <div
             className="rounded-full"
@@ -225,9 +211,14 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         {panelContent}
       </div>
 
-      {/* Desktop: slide in from right */}
+      {/* Desktop: backdrop + right panel — each a separate fixed root, no nesting */}
       <div
-        className="hidden md:flex ml-auto h-full flex-col overflow-hidden"
+        className="hidden md:block fixed inset-0 z-40"
+        style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+        onClick={onClose}
+      />
+      <div
+        className="hidden md:flex fixed top-0 right-0 bottom-0 z-40 flex-col overflow-hidden"
         style={{
           width: 360,
           backgroundColor: "var(--surface)",
@@ -237,7 +228,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
       >
         {panelContent}
       </div>
-    </div>
+    </>
   );
 }
 

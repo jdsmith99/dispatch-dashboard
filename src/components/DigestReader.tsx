@@ -70,10 +70,6 @@ export function DigestReader({ digestId, onClose }: DigestReaderProps) {
           color: "var(--text-muted)",
           border: "1px solid var(--border)",
         }}
-        onMouseEnter={(e) =>
-          (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)")
-        }
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
         ✕
       </button>
@@ -97,22 +93,22 @@ export function DigestReader({ digestId, onClose }: DigestReaderProps) {
   );
 
   return (
-    <div
-      className="fixed inset-0 z-50"
-      style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      {/* Mobile: full-screen */}
+    <>
+      {/* Mobile: full-screen panel — no backdrop, panel IS the screen */}
       <div
-        className="md:hidden fixed inset-0 flex flex-col overflow-hidden"
+        className="md:hidden fixed inset-0 z-50 flex flex-col overflow-hidden"
         style={{ backgroundColor: "var(--surface-raised)" }}
       >
         {header}
         {body}
       </div>
 
-      {/* Desktop: centered modal */}
-      <div className="hidden md:flex fixed inset-0 items-center justify-center p-4">
+      {/* Desktop: backdrop with centered modal — backdrop is the clickable root */}
+      <div
+        className="hidden md:flex fixed inset-0 z-50 items-center justify-center p-4"
+        style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+      >
         <div
           className="w-full max-w-2xl rounded-xl flex flex-col overflow-hidden"
           style={{
@@ -126,6 +122,6 @@ export function DigestReader({ digestId, onClose }: DigestReaderProps) {
           {body}
         </div>
       </div>
-    </div>
+    </>
   );
 }
