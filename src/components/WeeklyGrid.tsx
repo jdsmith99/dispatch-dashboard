@@ -45,8 +45,8 @@ interface WeeklyGridProps {
 export function WeeklyGrid({ tasks }: WeeklyGridProps) {
   const router = useRouter();
   const [detailTask, setDetailTask] = useState<TaskWithDigests | null>(null);
-  const todayIdx = getTodayDayIndex();
-  const [openDays, setOpenDays] = useState<Set<number>>(() => new Set([todayIdx]));
+  const [todayIdx] = useState<number>(() => getTodayDayIndex());
+  const [openDays, setOpenDays] = useState<Set<number>>(() => new Set([getTodayDayIndex()]));
 
   const scheduledTasks = tasks.filter((t) => t.cronExpression);
 

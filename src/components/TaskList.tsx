@@ -182,7 +182,7 @@ function TaskCard({
       {/* Bottom row: last run + digest count + run button */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
         <div className="flex items-center gap-3">
-          <span className="text-xs" style={{ color: "var(--text-faint)", fontSize: "10px" }}>
+          <span suppressHydrationWarning className="text-xs" style={{ color: "var(--text-faint)", fontSize: "10px" }}>
             Last: {task.lastRunAt ? relativeTime(task.lastRunAt) : "Never"}
           </span>
           {task.digestCount > 0 && (
@@ -287,10 +287,10 @@ function TaskRow({
         <span className="text-xs truncate" style={{ color: "var(--text-muted)", fontSize: "11px" }}>
           {task.cronExpression ? task.schedule : "—"}
         </span>
-        <span className="text-xs" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
+        <span suppressHydrationWarning className="text-xs" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
           {task.lastRunAt ? relativeTime(task.lastRunAt) : "Never"}
         </span>
-        <span className="text-xs" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
+        <span suppressHydrationWarning className="text-xs" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
           {task.nextRunAt ? relativeTime(task.nextRunAt) : "—"}
         </span>
         <span className="text-xs tabular-nums" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
