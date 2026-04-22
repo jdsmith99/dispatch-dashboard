@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { DigestFile, Category } from "@/lib/types";
 import { DigestReader } from "./DigestReader";
+import { runTaskNow } from "@/lib/actions";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "AI & Tech": "#a78bfa",
@@ -17,6 +18,8 @@ interface DigestFeedProps {
   digests: DigestFile[];
   categories: Category[];
   activeCategory?: Category;
+  activeTaskId?: string;
+  activeTaskName?: string;
   page: number;
   totalPages: number;
 }
@@ -25,6 +28,8 @@ export function DigestFeed({
   digests,
   categories,
   activeCategory,
+  activeTaskId,
+  activeTaskName,
   page,
   totalPages,
 }: DigestFeedProps) {
@@ -38,9 +43,14 @@ export function DigestFeed({
     router.push(`/digests?${params.toString()}`);
   }
 
+  function clearTaskFilter() {
+    router.push("/digests");
+  }
+
   function setPage(p: number) {
     const params = new URLSearchParams();
-    if (activeCategory) params.set("category", activeCategory);
+    if (activeTaskId) params.set("task", activeTaskId);
+    else if (activeCategory) params.set("category", activeCategory);
     params.set("page", String(p));
     router.push(`/digests?${params.toString()}`);
   }
@@ -48,36 +58,58 @@ export function DigestFeed({
   return (
     <>
       <div className="flex flex-col">
-        {/* Category filter pills */}
+        {/* Filter bar */}
         <div
-          className="flex items-center gap-1.5 px-5 py-3 overflow-x-auto shrink-0"
+          className="flex items-center gap-1.5 px-3 md:px-5 py-3 overflow-x-auto shrink-0"
           style={{ borderBottom: "1px solid var(--border)", backgroundColor: "var(--surface)" }}
         >
-          <FilterPill
-            label="All"
-            active={!activeCategory}
-            onClick={() => setCategory(undefined)}
-          />
-          {categories.map((cat) => (
-            <FilterPill
-              key={cat}
-              label={cat}
-              active={activeCategory === cat}
-              color={CATEGORY_COLORS[cat]}
-              onClick={() => setCategory(cat)}
-            />
-          ))}
+          {/* Task filter chip — shown instead of category pills when task is active */}
+          {activeTaskId ? (
+            <button
+              onClick={clearTaskFilter}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors"
+              style={{
+                backgroundColor: "rgba(94,106,210,0.15)",
+                color: "#a5b4fc",
+                border: "1px solid rgba(94,106,210,0.35)",
+              }}
+            >
+              <span
+                className="rounded-full shrink-0"
+                style={{ width: 5, height: 5, backgroundColor: "#a5b4fc" }}
+              />
+              {activeTaskName ?? activeTaskId}
+              <span
+                className="ml-0.5 opacity-60 hover:opacity-100"
+                style={{ fontSize: "10px" }}
+              >
+                ✕
+              </span>
+            </button>
+          ) : (
+            <>
+              <FilterPill
+                label="All"
+                active={!activeCategory}
+                onClick={() => setCategory(undefined)}
+              />
+              {categories.map((cat) => (
+                <FilterPill
+                  key={cat}
+                  label={cat}
+                  active={activeCategory === cat}
+                  color={CATEGORY_COLORS[cat]}
+                  onClick={() => setCategory(cat)}
+                />
+              ))}
+            </>
+          )}
         </div>
 
         {/* Digest list */}
         <div className="flex flex-col divide-y" style={{ borderColor: "var(--border-subtle)" }}>
           {digests.length === 0 && (
-            <div
-              className="flex items-center justify-center h-40 text-xs"
-              style={{ color: "var(--text-faint)" }}
-            >
-              No digests found
-            </div>
+            <EmptyState taskId={activeTaskId} taskName={activeTaskName} />
           )}
           {digests.map((digest) => (
             <DigestCard
@@ -132,6 +164,76 @@ export function DigestFeed({
   );
 }
 
+function EmptyState({
+  taskId,
+  taskName,
+}: {
+  taskId?: string;
+  taskName?: string;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+
+  function handleRun() {
+    if (!taskId) return;
+    startTransition(async () => {
+      const res = await runTaskNow(taskId);
+      setMsg(res.message);
+    });
+  }
+
+  if (taskId) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
+        <div
+          className="rounded-full flex items-center justify-center"
+          style={{ width: 40, height: 40, backgroundColor: "rgba(255,255,255,0.05)" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none" style={{ color: "var(--text-faint)" }}>
+            <path d="M4 2h5l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M9 2v3h3" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M5.5 8.5h5M5.5 11h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+        </div>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium" style={{ color: "#fff" }}>
+            No digests yet for {taskName ?? taskId}
+          </p>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            This task hasn&apos;t produced any output files yet.
+          </p>
+        </div>
+        <button
+          onClick={handleRun}
+          disabled={isPending}
+          className="text-xs px-4 py-2 rounded-md font-medium transition-colors"
+          style={{
+            backgroundColor: "var(--accent)",
+            color: "#fff",
+            opacity: isPending ? 0.6 : 1,
+          }}
+        >
+          {isPending ? "Running…" : "Run Now"}
+        </button>
+        {msg && (
+          <p className="text-xs max-w-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
+            {msg}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center justify-center h-40 text-xs"
+      style={{ color: "var(--text-faint)" }}
+    >
+      No digests found
+    </div>
+  );
+}
+
 function FilterPill({
   label,
   active,
@@ -181,14 +283,10 @@ function DigestCard({
 
   return (
     <div
-      className="flex items-start justify-between gap-4 px-5 py-3.5 group transition-colors"
+      className="flex items-start justify-between gap-3 px-3 md:px-5 py-3.5 transition-colors"
       style={{ backgroundColor: "var(--bg)" }}
-      onMouseEnter={(e) =>
-        (e.currentTarget.style.backgroundColor = "var(--surface)")
-      }
-      onMouseLeave={(e) =>
-        (e.currentTarget.style.backgroundColor = "var(--bg)")
-      }
+      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--surface)")}
+      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg)")}
     >
       <div className="flex flex-col gap-1 min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
@@ -221,10 +319,7 @@ function DigestCard({
       <button
         onClick={onRead}
         className="shrink-0 text-xs px-3 py-1.5 rounded-md transition-colors self-start"
-        style={{
-          color: "var(--text-muted)",
-          border: "1px solid var(--border)",
-        }}
+        style={{ color: "var(--text-muted)", border: "1px solid var(--border)" }}
         onMouseEnter={(e) => {
           e.currentTarget.style.color = "#fff";
           e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)";
