@@ -48,14 +48,186 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     return <DigestReader digestId={openDigestId} onClose={() => setOpenDigestId(null)} />;
   }
 
+  const panelContent = (
+    <>
+      {/* Panel header */}
+      <div
+        className="flex items-center justify-between px-4 py-3 shrink-0"
+        style={{ borderBottom: "1px solid var(--border)" }}
+      >
+        <span className="text-xs font-medium" style={{ color: "#fff" }}>
+          Task Detail
+        </span>
+        <button
+          onClick={onClose}
+          className="flex items-center justify-center rounded text-xs"
+          style={{
+            width: 28,
+            height: 28,
+            color: "var(--text-muted)",
+            border: "1px solid var(--border)",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)")
+          }
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Panel content */}
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        {/* Task name + status */}
+        <div className="flex flex-col gap-1.5">
+          <h2 className="text-sm font-semibold leading-tight" style={{ color: "#fff" }}>
+            {task.name}
+          </h2>
+          <div className="flex items-center flex-wrap gap-2">
+            <span
+              className={`rounded-full ${statusColor}`}
+              style={{ width: 7, height: 7, display: "inline-block", flexShrink: 0 }}
+            />
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {statusLabel}
+            </span>
+            <span
+              className="text-xs px-1.5 py-0.5 rounded"
+              style={{
+                backgroundColor: `${catColor}20`,
+                color: catColor,
+                border: `1px solid ${catColor}40`,
+              }}
+            >
+              {task.category}
+            </span>
+          </div>
+        </div>
+
+        {/* Description */}
+        <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
+          {task.description}
+        </p>
+
+        {/* Metadata rows */}
+        <div
+          className="rounded-lg p-3 flex flex-col gap-2"
+          style={{ backgroundColor: "var(--surface-raised)", border: "1px solid var(--border)" }}
+        >
+          <MetaRow label="Schedule" value={task.schedule} />
+          <MetaRow label="Last run" value={task.lastRunAt ? fmtDate(task.lastRunAt) : "Never"} />
+          <MetaRow label="Next run" value={task.nextRunAt ? fmtDate(task.nextRunAt) : "—"} />
+          <MetaRow label="Digests" value={String(task.digestCount)} />
+        </div>
+
+        {/* Run Now button */}
+        <div>
+          <button
+            onClick={handleRunNow}
+            disabled={isPending}
+            className="w-full py-2 px-3 rounded-md text-xs font-medium transition-colors"
+            style={{
+              backgroundColor: "var(--accent)",
+              color: "#fff",
+              opacity: isPending ? 0.6 : 1,
+            }}
+            onMouseEnter={(e) =>
+              !isPending && (e.currentTarget.style.backgroundColor = "var(--accent-hover)")
+            }
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--accent)")}
+          >
+            {isPending ? "Running…" : "Run Now"}
+          </button>
+          {runMessage && (
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+              {runMessage}
+            </p>
+          )}
+        </div>
+
+        {/* Recent digests */}
+        {task.recentDigests.length > 0 && (
+          <div>
+            <p
+              className="text-xs font-medium mb-2 uppercase tracking-widest"
+              style={{ color: "var(--text-faint)", fontSize: "10px" }}
+            >
+              Recent Digests
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {task.recentDigests.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => setOpenDigestId(d.id)}
+                  className="w-full text-left rounded-lg p-2.5 flex flex-col gap-0.5 transition-colors"
+                  style={{
+                    backgroundColor: "var(--surface-raised)",
+                    border: "1px solid var(--border-subtle)",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.borderColor = "var(--border-subtle)")
+                  }
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium truncate" style={{ color: "#fff" }}>
+                      {d.fileName}
+                    </span>
+                    <span className="text-xs shrink-0" style={{ color: "var(--text-faint)" }}>
+                      {new Date(d.date).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  {d.preview && (
+                    <p
+                      className="text-xs line-clamp-2 leading-relaxed"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {d.preview}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div
-      className="fixed inset-0 z-40 flex"
+      className="fixed inset-0 z-40"
       onClick={(e) => e.target === e.currentTarget && onClose()}
       style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
     >
+      {/* Mobile: slide up from bottom */}
       <div
-        className="ml-auto h-full flex flex-col overflow-hidden"
+        className="md:hidden fixed bottom-0 left-0 right-0 flex flex-col rounded-t-xl overflow-hidden"
+        style={{
+          maxHeight: "82vh",
+          backgroundColor: "var(--surface)",
+          borderTop: "1px solid var(--border)",
+          boxShadow: "0 -16px 40px rgba(0,0,0,0.4)",
+        }}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-2 pb-1 shrink-0">
+          <div
+            className="rounded-full"
+            style={{ width: 32, height: 4, backgroundColor: "rgba(255,255,255,0.15)" }}
+          />
+        </div>
+        {panelContent}
+      </div>
+
+      {/* Desktop: slide in from right */}
+      <div
+        className="hidden md:flex ml-auto h-full flex-col overflow-hidden"
         style={{
           width: 360,
           backgroundColor: "var(--surface)",
@@ -63,163 +235,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
           boxShadow: "-16px 0 40px rgba(0,0,0,0.4)",
         }}
       >
-        {/* Panel header */}
-        <div
-          className="flex items-center justify-between px-4 py-3 shrink-0"
-          style={{ borderBottom: "1px solid var(--border)" }}
-        >
-          <span className="text-xs font-medium" style={{ color: "#fff" }}>
-            Task Detail
-          </span>
-          <button
-            onClick={onClose}
-            className="flex items-center justify-center rounded text-xs"
-            style={{
-              width: 24,
-              height: 24,
-              color: "var(--text-muted)",
-              border: "1px solid var(--border)",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)")
-            }
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Panel content */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-          {/* Task name + status */}
-          <div className="flex flex-col gap-1.5">
-            <h2 className="text-sm font-semibold leading-tight" style={{ color: "#fff" }}>
-              {task.name}
-            </h2>
-            <div className="flex items-center gap-2">
-              <span
-                className={`rounded-full ${statusColor}`}
-                style={{ width: 7, height: 7, display: "inline-block" }}
-              />
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                {statusLabel}
-              </span>
-              <span
-                className="text-xs px-1.5 py-0.5 rounded"
-                style={{
-                  backgroundColor: `${catColor}20`,
-                  color: catColor,
-                  border: `1px solid ${catColor}40`,
-                }}
-              >
-                {task.category}
-              </span>
-            </div>
-          </div>
-
-          {/* Description */}
-          <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
-            {task.description}
-          </p>
-
-          {/* Metadata rows */}
-          <div
-            className="rounded-lg p-3 flex flex-col gap-2"
-            style={{ backgroundColor: "var(--surface-raised)", border: "1px solid var(--border)" }}
-          >
-            <MetaRow label="Schedule" value={task.schedule} />
-            <MetaRow
-              label="Last run"
-              value={task.lastRunAt ? fmtDate(task.lastRunAt) : "Never"}
-            />
-            <MetaRow
-              label="Next run"
-              value={task.nextRunAt ? fmtDate(task.nextRunAt) : "—"}
-            />
-            <MetaRow label="Digests" value={String(task.digestCount)} />
-          </div>
-
-          {/* Run Now button */}
-          <div>
-            <button
-              onClick={handleRunNow}
-              disabled={isPending}
-              className="w-full py-1.5 px-3 rounded-md text-xs font-medium transition-colors"
-              style={{
-                backgroundColor: "var(--accent)",
-                color: "#fff",
-                opacity: isPending ? 0.6 : 1,
-              }}
-              onMouseEnter={(e) =>
-                !isPending && (e.currentTarget.style.backgroundColor = "var(--accent-hover)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "var(--accent)")
-              }
-            >
-              {isPending ? "Running…" : "Run Now"}
-            </button>
-            {runMessage && (
-              <p
-                className="text-xs mt-2 leading-relaxed"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {runMessage}
-              </p>
-            )}
-          </div>
-
-          {/* Recent digests */}
-          {task.recentDigests.length > 0 && (
-            <div>
-              <p
-                className="text-xs font-medium mb-2 uppercase tracking-widest"
-                style={{ color: "var(--text-faint)", fontSize: "10px" }}
-              >
-                Recent Digests
-              </p>
-              <div className="flex flex-col gap-1.5">
-                {task.recentDigests.map((d) => (
-                  <button
-                    key={d.id}
-                    onClick={() => setOpenDigestId(d.id)}
-                    className="w-full text-left rounded-lg p-2.5 flex flex-col gap-0.5 transition-colors"
-                    style={{
-                      backgroundColor: "var(--surface-raised)",
-                      border: "1px solid var(--border-subtle)",
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.borderColor = "var(--border-subtle)")
-                    }
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium truncate" style={{ color: "#fff" }}>
-                        {d.fileName}
-                      </span>
-                      <span className="text-xs shrink-0" style={{ color: "var(--text-faint)" }}>
-                        {new Date(d.date).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                    </div>
-                    {d.preview && (
-                      <p
-                        className="text-xs line-clamp-2 leading-relaxed"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        {d.preview}
-                      </p>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        {panelContent}
       </div>
     </div>
   );

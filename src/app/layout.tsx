@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { loadTaskConfigs, getCategoryCounts } from "@/lib/tasks";
 
 export const metadata: Metadata = {
@@ -23,11 +24,17 @@ export default function RootLayout({
         className="h-full flex overflow-hidden"
         style={{ backgroundColor: "var(--bg)", color: "var(--text)" }}
       >
+        {/* Sidebar: desktop only */}
         <Sidebar categoryCounts={categoryCounts} totalCount={tasks.length} />
+
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-auto">{children}</main>
+          {/* pb-14 on mobile to clear the bottom tab bar */}
+          <main className="flex-1 overflow-auto pb-14 md:pb-0">{children}</main>
         </div>
+
+        {/* Bottom tab bar: mobile only */}
+        <BottomTabBar />
       </body>
     </html>
   );

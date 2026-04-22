@@ -27,7 +27,7 @@ export function Sidebar({ categoryCounts, totalCount }: SidebarProps) {
 
   return (
     <aside
-      className="flex flex-col shrink-0 h-full overflow-y-auto"
+      className="hidden md:flex flex-col shrink-0 h-full overflow-y-auto"
       style={{
         width: 200,
         backgroundColor: "var(--surface)",
@@ -149,7 +149,12 @@ function FileIcon({ size = 16 }: { size?: number }) {
         strokeWidth="1.2"
       />
       <path d="M9 2v3h3" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M5.5 8.5h5M5.5 11h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path
+        d="M5.5 8.5h5M5.5 11h3"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

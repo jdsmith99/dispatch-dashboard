@@ -27,7 +27,7 @@ export function Header() {
   return (
     <>
       <header
-        className="flex items-center justify-between px-5 shrink-0"
+        className="flex items-center justify-between px-3 md:px-5 shrink-0"
         style={{
           height: 44,
           borderBottom: "1px solid var(--border)",
@@ -41,24 +41,25 @@ export function Header() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setSearchOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors"
+            className="flex items-center gap-1.5 px-2 md:px-2.5 py-1.5 rounded-md text-xs transition-colors"
             style={{ color: "var(--text-muted)", backgroundColor: "transparent" }}
             onMouseEnter={(e) =>
               (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)")
             }
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-            title="Search digests (⌘K)"
+            title="Search digests"
           >
-            <SearchIcon size={13} />
-            <span>Search</span>
+            <SearchIcon size={14} />
+            {/* Hide label on mobile */}
+            <span className="hidden md:inline">Search</span>
           </button>
 
           <button
             onClick={handleRefresh}
             className="flex items-center justify-center rounded-md transition-colors"
             style={{
-              width: 28,
-              height: 28,
+              width: 32,
+              height: 32,
               color: "var(--text-muted)",
               backgroundColor: "transparent",
             }}
@@ -68,7 +69,7 @@ export function Header() {
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             title="Refresh data"
           >
-            <RefreshIcon size={13} spinning={refreshing} />
+            <RefreshIcon size={14} spinning={refreshing} />
           </button>
         </div>
       </header>
@@ -105,7 +106,13 @@ function RefreshIcon({ size = 16, spinning }: { size?: number; spinning?: boolea
         strokeWidth="1.3"
         strokeLinecap="round"
       />
-      <path d="M10.5 4H14V0.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M10.5 4H14V0.5"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

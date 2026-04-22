@@ -28,7 +28,7 @@ export function TaskList({ tasks }: TaskListProps) {
 
   return (
     <>
-      <div className="p-5 flex flex-col gap-6">
+      <div className="p-3 md:p-5 flex flex-col gap-5">
         <Section title="Scheduled" tasks={scheduled} onSelectTask={setSelectedTask} />
         <Section title="Manual" tasks={manual} onSelectTask={setSelectedTask} />
       </div>
@@ -72,40 +72,145 @@ function Section({
         </span>
       </div>
 
+      {/* Desktop table */}
       <div
-        className="rounded-xl overflow-hidden"
+        className="hidden md:block rounded-xl overflow-x-auto"
         style={{ border: "1px solid var(--border)" }}
       >
-        {/* Table header */}
-        <div
-          className="grid text-xs font-medium uppercase tracking-widest px-4 py-2"
+        <div style={{ minWidth: 680 }}>
+          <div
+            className="grid text-xs font-medium uppercase tracking-widest px-4 py-2"
+            style={{
+              gridTemplateColumns: "1fr 130px 160px 110px 110px 60px 80px",
+              borderBottom: "1px solid var(--border)",
+              backgroundColor: "var(--surface)",
+              color: "var(--text-faint)",
+              fontSize: "10px",
+            }}
+          >
+            <span>Name</span>
+            <span>Category</span>
+            <span>Schedule</span>
+            <span>Last run</span>
+            <span>Next run</span>
+            <span>Digests</span>
+            <span></span>
+          </div>
+          {tasks.map((task, idx) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              last={idx === tasks.length - 1}
+              onClick={() => onSelectTask(task)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Mobile card list */}
+      <div className="md:hidden flex flex-col gap-2">
+        {tasks.map((task) => (
+          <TaskCard key={task.id} task={task} onClick={() => onSelectTask(task)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TaskCard({
+  task,
+  onClick,
+}: {
+  task: TaskWithDigests;
+  onClick: () => void;
+}) {
+  const [runMsg, setRunMsg] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const status = getRunStatus(task);
+  const statusColor = getStatusColor(status);
+  const statusLabel = getStatusLabel(status);
+  const catColor = CATEGORY_COLORS[task.category] ?? "#6b7280";
+
+  function handleRun(e: React.MouseEvent) {
+    e.stopPropagation();
+    startTransition(async () => {
+      const res = await runTaskNow(task.id);
+      setRunMsg(res.message);
+      setTimeout(() => setRunMsg(null), 5000);
+    });
+  }
+
+  return (
+    <div
+      className="rounded-xl p-3 flex flex-col gap-2 cursor-pointer"
+      style={{
+        backgroundColor: "var(--surface)",
+        border: "1px solid var(--border-subtle)",
+      }}
+      onClick={onClick}
+    >
+      {/* Top row: status dot + name + category */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`shrink-0 rounded-full ${statusColor}`}
+            style={{ width: 7, height: 7 }}
+            title={statusLabel}
+          />
+          <span className="text-xs font-medium truncate" style={{ color: "#fff" }}>
+            {task.name}
+          </span>
+        </div>
+        <span
+          className="shrink-0 text-xs px-1.5 py-0.5 rounded"
           style={{
-            gridTemplateColumns: "1fr 130px 160px 110px 110px 60px 80px",
-            borderBottom: "1px solid var(--border)",
-            backgroundColor: "var(--surface)",
-            color: "var(--text-faint)",
+            backgroundColor: `${catColor}20`,
+            color: catColor,
+            border: `1px solid ${catColor}40`,
             fontSize: "10px",
           }}
         >
-          <span>Name</span>
-          <span>Category</span>
-          <span>Schedule</span>
-          <span>Last run</span>
-          <span>Next run</span>
-          <span>Digests</span>
-          <span></span>
-        </div>
-
-        {/* Rows */}
-        {tasks.map((task, idx) => (
-          <TaskRow
-            key={task.id}
-            task={task}
-            last={idx === tasks.length - 1}
-            onClick={() => onSelectTask(task)}
-          />
-        ))}
+          {task.category}
+        </span>
       </div>
+
+      {/* Schedule */}
+      <p className="text-xs" style={{ color: "var(--text-muted)", fontSize: "11px" }}>
+        {task.cronExpression ? task.schedule : "Manual only"}
+      </p>
+
+      {/* Bottom row: last run + digest count + run button */}
+      <div className="flex items-center justify-between gap-2 pt-0.5">
+        <div className="flex items-center gap-3">
+          <span className="text-xs" style={{ color: "var(--text-faint)", fontSize: "10px" }}>
+            Last: {task.lastRunAt ? relativeTime(task.lastRunAt) : "Never"}
+          </span>
+          {task.digestCount > 0 && (
+            <span className="text-xs tabular-nums" style={{ color: "var(--text-faint)", fontSize: "10px" }}>
+              {task.digestCount} digests
+            </span>
+          )}
+        </div>
+        {!task.cronExpression && (
+          <button
+            onClick={handleRun}
+            disabled={isPending}
+            className="text-xs px-2.5 py-1 rounded-md transition-colors"
+            style={{
+              color: "#fff",
+              backgroundColor: "var(--accent)",
+              opacity: isPending ? 0.6 : 1,
+            }}
+          >
+            {isPending ? "…" : "Run"}
+          </button>
+        )}
+      </div>
+      {runMsg && (
+        <p className="text-xs leading-relaxed" style={{ color: "var(--text-faint)", fontSize: "10px" }}>
+          {runMsg}
+        </p>
+      )}
     </div>
   );
 }
@@ -136,7 +241,7 @@ function TaskRow({
 
   return (
     <div
-      className="group cursor-pointer transition-colors"
+      className="cursor-pointer transition-colors"
       style={{
         borderBottom: last ? undefined : "1px solid var(--border-subtle)",
         backgroundColor: "var(--bg)",
@@ -147,11 +252,8 @@ function TaskRow({
     >
       <div
         className="grid items-center px-4 py-2.5"
-        style={{
-          gridTemplateColumns: "1fr 130px 160px 110px 110px 60px 80px",
-        }}
+        style={{ gridTemplateColumns: "1fr 130px 160px 110px 110px 60px 80px" }}
       >
-        {/* Name + status */}
         <div className="flex items-center gap-2 min-w-0">
           <span
             className={`shrink-0 rounded-full ${statusColor}`}
@@ -169,8 +271,6 @@ function TaskRow({
             )}
           </div>
         </div>
-
-        {/* Category */}
         <div>
           <span
             className="text-xs px-1.5 py-0.5 rounded"
@@ -184,28 +284,18 @@ function TaskRow({
             {task.category}
           </span>
         </div>
-
-        {/* Schedule */}
         <span className="text-xs truncate" style={{ color: "var(--text-muted)", fontSize: "11px" }}>
           {task.cronExpression ? task.schedule : "—"}
         </span>
-
-        {/* Last run */}
         <span className="text-xs" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
           {task.lastRunAt ? relativeTime(task.lastRunAt) : "Never"}
         </span>
-
-        {/* Next run */}
         <span className="text-xs" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
           {task.nextRunAt ? relativeTime(task.nextRunAt) : "—"}
         </span>
-
-        {/* Digest count */}
         <span className="text-xs tabular-nums" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
           {task.digestCount > 0 ? task.digestCount : "—"}
         </span>
-
-        {/* Run Now */}
         <div className="flex justify-end">
           {!task.cronExpression && (
             <button
@@ -219,8 +309,7 @@ function TaskRow({
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-                (e.currentTarget as HTMLButtonElement).style.borderColor =
-                  "rgba(255,255,255,0.25)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.25)";
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
@@ -240,16 +329,9 @@ function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const abs = Math.abs(diff);
   const future = diff < 0;
-
   if (abs < 60_000) return future ? "in moments" : "just now";
-  if (abs < 3_600_000) {
-    const m = Math.round(abs / 60_000);
-    return future ? `in ${m}m` : `${m}m ago`;
-  }
-  if (abs < 86_400_000) {
-    const h = Math.round(abs / 3_600_000);
-    return future ? `in ${h}h` : `${h}h ago`;
-  }
+  if (abs < 3_600_000) { const m = Math.round(abs / 60_000); return future ? `in ${m}m` : `${m}m ago`; }
+  if (abs < 86_400_000) { const h = Math.round(abs / 3_600_000); return future ? `in ${h}h` : `${h}h ago`; }
   const d = Math.round(abs / 86_400_000);
   return future ? `in ${d}d` : `${d}d ago`;
 }
