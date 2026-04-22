@@ -33,9 +33,9 @@ function formatTime(cronExpr: string): string {
   return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
-function getTodayDayIndex(): number {
-  const dow = new Date().getDay();
-  return dow === 0 ? 6 : dow - 1;
+function getTodayIndex(): number {
+  const dow = new Date().getDay(); // 0=Sun … 6=Sat
+  return dow === 0 ? 6 : dow - 1;  // convert to Mon=0 … Sun=6
 }
 
 interface WeeklyGridProps {
@@ -45,17 +45,19 @@ interface WeeklyGridProps {
 export function WeeklyGrid({ tasks }: WeeklyGridProps) {
   const router = useRouter();
   const [detailTask, setDetailTask] = useState<TaskWithDigests | null>(null);
-  const [todayIdx] = useState<number>(() => getTodayDayIndex());
-  const [openDays, setOpenDays] = useState<Set<number>>(() => new Set([getTodayDayIndex()]));
+  // Use lazy initializer so value is computed once and matches between SSR and hydration
+  const [todayIdx] = useState<number>(() => getTodayIndex());
+  const [openDay, setOpenDay] = useState<number>(() => getTodayIndex());
 
   const scheduledTasks = tasks.filter((t) => t.cronExpression);
 
+  // Build per-day task lists: DAYS[0]=Mon, DAYS[6]=Sun
+  // cron dow: 0=Sun, 1=Mon … 6=Sat
   const tasksByDay: TaskWithDigests[][] = DAYS.map((_, idx) => {
-    const dayIdx = idx === 6 ? 0 : idx + 1;
+    const cronDow = idx === 6 ? 0 : idx + 1;
     return scheduledTasks.filter((t) => {
       if (isMonthly(t.cronExpression!)) return false;
-      const days = getTaskDaysOfWeek(t.cronExpression!);
-      return days.includes(dayIdx);
+      return getTaskDaysOfWeek(t.cronExpression!).includes(cronDow);
     });
   });
 
@@ -64,12 +66,7 @@ export function WeeklyGrid({ tasks }: WeeklyGridProps) {
   );
 
   function toggleDay(idx: number) {
-    setOpenDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
-      return next;
-    });
+    setOpenDay((prev) => (prev === idx ? -1 : idx));
   }
 
   function goToDigests(task: TaskWithDigests) {
@@ -145,7 +142,7 @@ export function WeeklyGrid({ tasks }: WeeklyGridProps) {
         {DAYS.map((day, idx) => {
           const dayTasks = tasksByDay[idx];
           const isToday = idx === todayIdx;
-          const isOpen = openDays.has(idx);
+          const isOpen = openDay === idx;
 
           return (
             <div
@@ -154,7 +151,7 @@ export function WeeklyGrid({ tasks }: WeeklyGridProps) {
               style={{ border: `1px solid ${isOpen ? "var(--border)" : "var(--border-subtle)"}` }}
             >
               <button
-                className="w-full flex items-center justify-between px-3 py-2.5 transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2.5"
                 style={{
                   backgroundColor: isToday && !isOpen
                     ? "rgba(94,106,210,0.08)"
@@ -265,16 +262,13 @@ interface TaskCellProps {
 function TaskCell({ task, onClick, onInfo, compact }: TaskCellProps) {
   const status = getRunStatus(task);
   const color = getStatusColor(status);
-  const label = getStatusLabel(status);
 
   return (
     <div className="relative group w-full">
       <button
         onClick={onClick}
-        className="w-full text-left rounded-md px-2 py-1.5 flex items-start gap-1.5 transition-colors"
+        className="w-full text-left rounded-md px-2 py-1.5 flex items-start gap-1.5"
         style={{ backgroundColor: "var(--surface)", border: "1px solid var(--border-subtle)" }}
-        onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)")}
-        onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
         title={`${task.name} — view digests`}
       >
         <span className={`shrink-0 rounded-full mt-1 ${color}`} style={{ width: 6, height: 6 }} />
@@ -294,17 +288,10 @@ function TaskCell({ task, onClick, onInfo, compact }: TaskCellProps) {
           </span>
         )}
       </button>
-
-      {/* Info icon — visible on hover (desktop) */}
       <button
         onClick={onInfo}
-        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded"
-        style={{
-          width: 16,
-          height: 16,
-          backgroundColor: "rgba(255,255,255,0.1)",
-          color: "var(--text-faint)",
-        }}
+        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded"
+        style={{ width: 16, height: 16, backgroundColor: "rgba(255,255,255,0.1)", color: "var(--text-faint)" }}
         title={`${task.name} — details`}
       >
         <InfoIcon size={9} />
@@ -329,14 +316,12 @@ function MobileTaskRow({
 
   return (
     <div
-      className="flex items-center gap-0"
+      className="flex items-center"
       style={{ borderBottom: last ? undefined : "1px solid var(--border-subtle)" }}
     >
       <button
         onClick={onClick}
-        className="flex-1 flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors min-w-0"
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)")}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+        className="flex-1 flex items-center gap-2.5 px-3 py-2.5 text-left min-w-0"
       >
         <span className={`shrink-0 rounded-full ${color}`} style={{ width: 7, height: 7 }} />
         <span className="flex-1 text-xs font-medium truncate" style={{ color: "#e2e2e5" }}>
@@ -351,8 +336,6 @@ function MobileTaskRow({
           </span>
         )}
       </button>
-
-      {/* Info button — always visible on mobile */}
       <button
         onClick={onInfo}
         className="shrink-0 flex items-center justify-center px-2"
