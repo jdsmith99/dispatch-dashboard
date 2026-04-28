@@ -1,20 +1,54 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { DigestFile, Category } from "@/lib/types";
 import { DigestReader } from "./DigestReader";
+import { CategoryBadge, CATEGORY_COLORS } from "./CategoryBadge";
 import { runTaskNow } from "@/lib/actions";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "AI & Tech": "#a78bfa",
-  "Arts & Entertainment": "#f59e0b",
-  "VC Investing": "#34d399",
-  Ventures: "#60a5fa",
-  "Events & Research": "#f87171",
-};
-
 const PAGE_SIZE = 50;
+
+// ─── Hooks ───────────────────────────────────────────────────────────────────
+
+/** Returns the ISO timestamp of the last time the user visited the page.
+ *  Updates the stored value on each mount so current digests become "seen"
+ *  on the next visit. Returns null on first visit (nothing is "new" yet). */
+function useUnreadCutoff(): string | null {
+  const [cutoff, setCutoff] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const prev = localStorage.getItem("dispatch_last_seen");
+      setCutoff(prev);
+      localStorage.setItem("dispatch_last_seen", new Date().toISOString());
+    } catch {
+      // localStorage unavailable (private browsing, etc.) — silently skip
+    }
+  }, []);
+  return cutoff;
+}
+
+/** Persists the selected category filter across page refreshes via sessionStorage. */
+function usePersistentCategory(): [Category | null, (c: Category | null) => void] {
+  const [cat, setCat] = useState<Category | null>(null);
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("dispatch_cat");
+      if (stored) setCat(stored as Category);
+    } catch {}
+  }, []);
+
+  function setCategory(c: Category | null) {
+    setCat(c);
+    try {
+      if (c) sessionStorage.setItem("dispatch_cat", c);
+      else sessionStorage.removeItem("dispatch_cat");
+    } catch {}
+  }
+  return [cat, setCategory];
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 interface DigestFeedProps {
   digests: DigestFile[];
@@ -25,9 +59,10 @@ interface DigestFeedProps {
 
 export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }: DigestFeedProps) {
   const router = useRouter();
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategory, setSelectedCategory] = usePersistentCategory();
   const [openDigestId, setOpenDigestId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const unreadCutoff = useUnreadCutoff();
 
   function handleCategorySelect(cat: Category | null) {
     setSelectedCategory(cat);
@@ -40,6 +75,17 @@ export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Count digests per category for badge labels
+  const categoryCounts = categories.reduce<Record<string, number>>((acc, cat) => {
+    acc[cat] = digests.filter((d) => d.category === cat).length;
+    return acc;
+  }, {});
+
+  function isNew(digest: DigestFile): boolean {
+    if (!unreadCutoff) return false;
+    return digest.date > unreadCutoff;
+  }
 
   return (
     <>
@@ -70,6 +116,7 @@ export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }
             <>
               <FilterPill
                 label="All"
+                count={digests.length}
                 active={selectedCategory === null}
                 onClick={() => handleCategorySelect(null)}
               />
@@ -77,6 +124,7 @@ export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }
                 <FilterPill
                   key={cat}
                   label={cat}
+                  count={categoryCounts[cat] ?? 0}
                   active={selectedCategory === cat}
                   color={CATEGORY_COLORS[cat]}
                   onClick={() => handleCategorySelect(cat)}
@@ -95,6 +143,7 @@ export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }
               <DigestCard
                 key={digest.id}
                 digest={digest}
+                isNew={isNew(digest)}
                 onRead={() => setOpenDigestId(digest.id)}
               />
             ))
@@ -121,6 +170,9 @@ export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }
             </button>
             <span className="text-xs" style={{ color: "var(--text-faint)" }}>
               Page {page} of {totalPages}
+              <span className="ml-1" style={{ color: "var(--text-faint)", opacity: 0.6 }}>
+                ({filtered.length} digests)
+              </span>
             </span>
             <button
               disabled={page >= totalPages}
@@ -139,19 +191,27 @@ export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }
       </div>
 
       {openDigestId && (
-        <DigestReader digestId={openDigestId} onClose={() => setOpenDigestId(null)} />
+        <DigestReader
+          digestId={openDigestId}
+          allDigestIds={filtered.map((d) => d.id)}
+          onClose={() => setOpenDigestId(null)}
+        />
       )}
     </>
   );
 }
 
+// ─── FilterPill ───────────────────────────────────────────────────────────────
+
 function FilterPill({
   label,
+  count,
   active,
   color,
   onClick,
 }: {
   label: string;
+  count: number;
   active: boolean;
   color?: string;
   onClick: () => void;
@@ -177,39 +237,59 @@ function FilterPill({
         />
       )}
       {label}
+      <span
+        className="tabular-nums"
+        style={{
+          fontSize: "10px",
+          color: active ? (color ? `${color}cc` : "rgba(255,255,255,0.5)") : "var(--text-faint)",
+        }}
+      >
+        {count}
+      </span>
     </button>
   );
 }
 
-function DigestCard({ digest, onRead }: { digest: DigestFile; onRead: () => void }) {
-  const catColor = CATEGORY_COLORS[digest.category] ?? "#6b7280";
+// ─── DigestCard ───────────────────────────────────────────────────────────────
 
+function DigestCard({
+  digest,
+  isNew,
+  onRead,
+}: {
+  digest: DigestFile;
+  isNew: boolean;
+  onRead: () => void;
+}) {
   return (
-    <div
-      className="flex items-start justify-between gap-3 px-3 md:px-5 py-3.5"
-      style={{ backgroundColor: "var(--bg)", borderBottom: "1px solid var(--border-subtle)" }}
+    <button
+      onClick={onRead}
+      className="w-full text-left flex items-start gap-3 px-3 md:px-5 py-3.5 transition-colors hover:brightness-110"
+      style={{
+        backgroundColor: "var(--bg)",
+        borderBottom: "1px solid var(--border-subtle)",
+        borderLeft: isNew ? "2px solid var(--accent)" : "2px solid transparent",
+        cursor: "pointer",
+      }}
     >
       <div className="flex flex-col gap-1 min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
+          {isNew && (
+            <span
+              className="rounded-full shrink-0"
+              style={{ width: 6, height: 6, backgroundColor: "var(--accent)" }}
+              title="New since last visit"
+            />
+          )}
           <span className="text-xs font-medium" style={{ color: "#fff" }}>
             {digest.taskName}
           </span>
-          <span
-            className="text-xs px-1.5 py-0.5 rounded"
-            style={{
-              backgroundColor: `${catColor}20`,
-              color: catColor,
-              border: `1px solid ${catColor}40`,
-              fontSize: "10px",
-            }}
-          >
-            {digest.category}
-          </span>
+          <CategoryBadge category={digest.category} />
           <span className="text-xs" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
             {new Date(digest.date).toLocaleDateString("en-US", {
-              weekday: "short",
               month: "short",
               day: "numeric",
+              year: "numeric",
             })}
           </span>
         </div>
@@ -217,16 +297,17 @@ function DigestCard({ digest, onRead }: { digest: DigestFile; onRead: () => void
           {digest.preview || digest.fileName}
         </p>
       </div>
-      <button
-        onClick={onRead}
+      <span
         className="shrink-0 text-xs px-3 py-1.5 rounded-md self-start"
         style={{ color: "var(--text-muted)", border: "1px solid var(--border)" }}
       >
         Read
-      </button>
-    </div>
+      </span>
+    </button>
   );
 }
+
+// ─── EmptyState ───────────────────────────────────────────────────────────────
 
 function EmptyState({ taskId, taskName }: { taskId?: string; taskName?: string }) {
   const [isPending, startTransition] = useTransition();

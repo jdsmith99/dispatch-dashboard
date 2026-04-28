@@ -75,6 +75,15 @@ body {
 .prose a:hover { text-decoration: underline; }
 .prose strong { color: #fff; font-weight: 600; }
 .prose hr { border-color: var(--border); margin: 1.5em 0; }
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.65; }
+}
+.skeleton {
+  background: rgba(255,255,255,0.08);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
 .prose table { width: 100%; border-collapse: collapse; margin-bottom: 1em; }
 .prose th {
   text-align: left;

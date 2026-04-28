@@ -34,8 +34,8 @@ function formatTime(cronExpr: string): string {
 }
 
 function getTodayIndex(): number {
-  const dow = new Date().getDay(); // 0=Sun … 6=Sat
-  return dow === 0 ? 6 : dow - 1;  // convert to Mon=0 … Sun=6
+  const dow = new Date().getDay();
+  return dow === 0 ? 6 : dow - 1;
 }
 
 interface WeeklyGridProps {
@@ -45,14 +45,11 @@ interface WeeklyGridProps {
 export function WeeklyGrid({ tasks }: WeeklyGridProps) {
   const router = useRouter();
   const [detailTask, setDetailTask] = useState<TaskWithDigests | null>(null);
-  // Use lazy initializer so value is computed once and matches between SSR and hydration
   const [todayIdx] = useState<number>(() => getTodayIndex());
   const [openDay, setOpenDay] = useState<number>(() => getTodayIndex());
 
   const scheduledTasks = tasks.filter((t) => t.cronExpression);
 
-  // Build per-day task lists: DAYS[0]=Mon, DAYS[6]=Sun
-  // cron dow: 0=Sun, 1=Mon … 6=Sat
   const tasksByDay: TaskWithDigests[][] = DAYS.map((_, idx) => {
     const cronDow = idx === 6 ? 0 : idx + 1;
     return scheduledTasks.filter((t) => {
@@ -89,21 +86,31 @@ export function WeeklyGrid({ tasks }: WeeklyGridProps) {
             backgroundColor: "var(--surface)",
           }}
         >
-          {DAYS.map((day, idx) => (
-            <div
-              key={day}
-              className="px-3 py-2 text-center"
-              style={{
-                color: idx === todayIdx ? "#fff" : "var(--text-faint)",
-                fontSize: "10px",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                fontWeight: 500,
-              }}
-            >
-              {day}
-            </div>
-          ))}
+          {DAYS.map((day, idx) => {
+            const isToday = idx === todayIdx;
+            return (
+              <div
+                key={day}
+                className="px-3 py-2 text-center relative"
+                style={{
+                  color: isToday ? "var(--accent)" : "var(--text-faint)",
+                  fontSize: "10px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  fontWeight: isToday ? 700 : 500,
+                  borderLeft: isToday ? "2px solid var(--accent)" : "2px solid transparent",
+                }}
+              >
+                {day}
+                {isToday && (
+                  <span
+                    className="block mx-auto mt-0.5 rounded-full"
+                    style={{ width: 4, height: 4, backgroundColor: "var(--accent)" }}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Grid cells */}
@@ -115,25 +122,30 @@ export function WeeklyGrid({ tasks }: WeeklyGridProps) {
             minHeight: 320,
           }}
         >
-          {tasksByDay.map((dayTasks, idx) => (
-            <div
-              key={idx}
-              className="p-2 flex flex-col gap-1"
-              style={{
-                borderRight: idx < 6 ? "1px solid var(--border-subtle)" : undefined,
-                minHeight: 80,
-              }}
-            >
-              {dayTasks.map((task) => (
-                <TaskCell
-                  key={task.id}
-                  task={task}
-                  onClick={() => goToDigests(task)}
-                  onInfo={(e) => { e.stopPropagation(); setDetailTask(task); }}
-                />
-              ))}
-            </div>
-          ))}
+          {tasksByDay.map((dayTasks, idx) => {
+            const isToday = idx === todayIdx;
+            return (
+              <div
+                key={idx}
+                className="p-2 flex flex-col gap-1"
+                style={{
+                  borderRight: idx < 6 ? "1px solid var(--border-subtle)" : undefined,
+                  borderLeft: isToday ? "2px solid var(--accent)" : "2px solid transparent",
+                  backgroundColor: isToday ? "rgba(94,106,210,0.04)" : undefined,
+                  minHeight: 80,
+                }}
+              >
+                {dayTasks.map((task) => (
+                  <TaskCell
+                    key={task.id}
+                    task={task}
+                    onClick={() => goToDigests(task)}
+                    onInfo={(e) => { e.stopPropagation(); setDetailTask(task); }}
+                  />
+                ))}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -148,14 +160,16 @@ export function WeeklyGrid({ tasks }: WeeklyGridProps) {
             <div
               key={day}
               className="rounded-lg overflow-hidden"
-              style={{ border: `1px solid ${isOpen ? "var(--border)" : "var(--border-subtle)"}` }}
+              style={{
+                border: `1px solid ${isToday || isOpen ? "var(--border)" : "var(--border-subtle)"}`,
+                boxShadow: isToday && !isOpen ? "inset 2px 0 0 var(--accent)" : undefined,
+              }}
             >
               <button
                 className="w-full flex items-center justify-between px-3 py-2.5"
                 style={{
-                  backgroundColor: isToday && !isOpen
-                    ? "rgba(94,106,210,0.08)"
-                    : "var(--surface)",
+                  backgroundColor:
+                    isToday && !isOpen ? "rgba(94,106,210,0.08)" : "var(--surface)",
                   borderBottom: isOpen ? "1px solid var(--border)" : undefined,
                 }}
                 onClick={() => toggleDay(idx)}

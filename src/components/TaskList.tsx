@@ -6,14 +6,10 @@ import { getRunStatus, getStatusColor, getStatusLabel } from "@/lib/runStatus";
 import { runTaskNow } from "@/lib/actions";
 import { DigestReader } from "./DigestReader";
 import { TaskDetailPanel } from "./TaskDetailPanel";
+import { CategoryBadge } from "./CategoryBadge";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "AI & Tech": "#a78bfa",
-  "Arts & Entertainment": "#f59e0b",
-  "VC Investing": "#34d399",
-  Ventures: "#60a5fa",
-  "Events & Research": "#f87171",
-};
+type SortKey = "name" | "lastRunAt" | "nextRunAt" | "digestCount";
+type SortDir = "asc" | "desc";
 
 interface TaskListProps {
   tasks: TaskWithDigests[];
@@ -43,6 +39,30 @@ export function TaskList({ tasks }: TaskListProps) {
   );
 }
 
+// ─── Section ──────────────────────────────────────────────────────────────────
+
+function sortTasks(tasks: TaskWithDigests[], key: SortKey, dir: SortDir): TaskWithDigests[] {
+  const mult = dir === "asc" ? 1 : -1;
+  return [...tasks].sort((a, b) => {
+    switch (key) {
+      case "name":
+        return mult * a.name.localeCompare(b.name);
+      case "lastRunAt": {
+        const at = a.lastRunAt ? new Date(a.lastRunAt).getTime() : 0;
+        const bt = b.lastRunAt ? new Date(b.lastRunAt).getTime() : 0;
+        return mult * (at - bt);
+      }
+      case "nextRunAt": {
+        const at = a.nextRunAt ? new Date(a.nextRunAt).getTime() : Infinity;
+        const bt = b.nextRunAt ? new Date(b.nextRunAt).getTime() : Infinity;
+        return mult * (at - bt);
+      }
+      case "digestCount":
+        return mult * (a.digestCount - b.digestCount);
+    }
+  });
+}
+
 function Section({
   title,
   tasks,
@@ -52,6 +72,20 @@ function Section({
   tasks: TaskWithDigests[];
   onSelectTask: (t: TaskWithDigests) => void;
 }) {
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function handleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sorted = sortTasks(tasks, sortKey, sortDir);
+
   return (
     <div>
       <div
@@ -78,38 +112,94 @@ function Section({
         style={{ border: "1px solid var(--border)" }}
       >
         <div style={{ minWidth: 680 }}>
+          {/* Column headers */}
           <div
-            className="grid text-xs font-medium uppercase tracking-widest px-4 py-2"
+            className="grid px-4 py-2"
             style={{
               gridTemplateColumns: "1fr 130px 160px 110px 110px 60px 80px",
               borderBottom: "1px solid var(--border)",
               backgroundColor: "var(--surface)",
-              color: "var(--text-faint)",
-              fontSize: "10px",
             }}
           >
-            <span>Name</span>
-            <span>Category</span>
-            <span>Schedule</span>
-            <span>Last run</span>
-            <span>Next run</span>
-            <span>Digests</span>
-            <span></span>
+            {(
+              [
+                { key: "name" as SortKey, label: "Name" },
+                { key: null, label: "Category" },
+                { key: null, label: "Schedule" },
+                { key: "lastRunAt" as SortKey, label: "Last run" },
+                { key: "nextRunAt" as SortKey, label: "Next run" },
+                { key: "digestCount" as SortKey, label: "Digests" },
+                { key: null, label: "" },
+              ] as { key: SortKey | null; label: string }[]
+            ).map(({ key, label }, i) =>
+              key ? (
+                <button
+                  key={i}
+                  onClick={() => handleSort(key)}
+                  className="flex items-center gap-1 text-left transition-colors"
+                  style={{
+                    color: sortKey === key ? "var(--text-muted)" : "var(--text-faint)",
+                    fontSize: "10px",
+                    fontWeight: 500,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {label}
+                  <SortIcon active={sortKey === key} dir={sortDir} />
+                </button>
+              ) : (
+                <span
+                  key={i}
+                  style={{
+                    color: "var(--text-faint)",
+                    fontSize: "10px",
+                    fontWeight: 500,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {label}
+                </span>
+              )
+            )}
           </div>
-          {tasks.map((task, idx) => (
+
+          {sorted.map((task, idx) => (
             <TaskRow
               key={task.id}
               task={task}
-              last={idx === tasks.length - 1}
+              last={idx === sorted.length - 1}
               onClick={() => onSelectTask(task)}
             />
           ))}
         </div>
       </div>
 
+      {/* Mobile sort control */}
+      <div className="md:hidden flex items-center gap-2 mb-2">
+        <span className="text-xs" style={{ color: "var(--text-faint)", fontSize: "10px" }}>Sort:</span>
+        {(["name", "lastRunAt", "digestCount"] as SortKey[]).map((key) => (
+          <button
+            key={key}
+            onClick={() => handleSort(key)}
+            className="flex items-center gap-0.5 px-2 py-0.5 rounded text-xs"
+            style={{
+              fontSize: "10px",
+              color: sortKey === key ? "#fff" : "var(--text-faint)",
+              backgroundColor: sortKey === key ? "rgba(255,255,255,0.08)" : "transparent",
+              border: "1px solid var(--border)",
+            }}
+          >
+            {({ name: "Name", lastRunAt: "Last run", digestCount: "Digests" } as Record<string, string>)[key]}
+            {sortKey === key && <SortIcon active dir={sortDir} />}
+          </button>
+        ))}
+      </div>
+
       {/* Mobile card list */}
       <div className="md:hidden flex flex-col gap-2">
-        {tasks.map((task) => (
+        {sorted.map((task) => (
           <TaskCard key={task.id} task={task} onClick={() => onSelectTask(task)} />
         ))}
       </div>
@@ -117,19 +207,28 @@ function Section({
   );
 }
 
-function TaskCard({
-  task,
-  onClick,
-}: {
-  task: TaskWithDigests;
-  onClick: () => void;
-}) {
+// ─── Sort icon ────────────────────────────────────────────────────────────────
+
+function SortIcon({ active, dir }: { active: boolean; dir?: SortDir }) {
+  return (
+    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ opacity: active ? 1 : 0.3 }}>
+      {!active || dir === "asc" ? (
+        <path d="M4 1.5L6.5 5.5H1.5L4 1.5Z" fill="currentColor" />
+      ) : (
+        <path d="M4 6.5L1.5 2.5H6.5L4 6.5Z" fill="currentColor" />
+      )}
+    </svg>
+  );
+}
+
+// ─── TaskCard (mobile) ────────────────────────────────────────────────────────
+
+function TaskCard({ task, onClick }: { task: TaskWithDigests; onClick: () => void }) {
   const [runMsg, setRunMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const status = getRunStatus(task);
   const statusColor = getStatusColor(status);
   const statusLabel = getStatusLabel(status);
-  const catColor = CATEGORY_COLORS[task.category] ?? "#6b7280";
 
   function handleRun(e: React.MouseEvent) {
     e.stopPropagation();
@@ -143,10 +242,7 @@ function TaskCard({
   return (
     <div
       className="rounded-xl p-3 flex flex-col gap-2 cursor-pointer"
-      style={{
-        backgroundColor: "var(--surface)",
-        border: "1px solid var(--border-subtle)",
-      }}
+      style={{ backgroundColor: "var(--surface)", border: "1px solid var(--border-subtle)" }}
       onClick={onClick}
     >
       {/* Top row: status dot + name + category */}
@@ -161,17 +257,7 @@ function TaskCard({
             {task.name}
           </span>
         </div>
-        <span
-          className="shrink-0 text-xs px-1.5 py-0.5 rounded"
-          style={{
-            backgroundColor: `${catColor}20`,
-            color: catColor,
-            border: `1px solid ${catColor}40`,
-            fontSize: "10px",
-          }}
-        >
-          {task.category}
-        </span>
+        <CategoryBadge category={task.category} />
       </div>
 
       {/* Schedule */}
@@ -179,7 +265,7 @@ function TaskCard({
         {task.cronExpression ? task.schedule : "Manual only"}
       </p>
 
-      {/* Bottom row: last run + digest count + run button */}
+      {/* Bottom row */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
         <div className="flex items-center gap-3">
           <span suppressHydrationWarning className="text-xs" style={{ color: "var(--text-faint)", fontSize: "10px" }}>
@@ -196,11 +282,7 @@ function TaskCard({
             onClick={handleRun}
             disabled={isPending}
             className="text-xs px-2.5 py-1 rounded-md transition-colors"
-            style={{
-              color: "#fff",
-              backgroundColor: "var(--accent)",
-              opacity: isPending ? 0.6 : 1,
-            }}
+            style={{ color: "#fff", backgroundColor: "var(--accent)", opacity: isPending ? 0.6 : 1 }}
           >
             {isPending ? "…" : "Run"}
           </button>
@@ -215,20 +297,13 @@ function TaskCard({
   );
 }
 
-function TaskRow({
-  task,
-  last,
-  onClick,
-}: {
-  task: TaskWithDigests;
-  last: boolean;
-  onClick: () => void;
-}) {
+// ─── TaskRow (desktop) ────────────────────────────────────────────────────────
+
+function TaskRow({ task, last, onClick }: { task: TaskWithDigests; last: boolean; onClick: () => void }) {
   const [runMsg, setRunMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const status = getRunStatus(task);
   const statusColor = getStatusColor(status);
-  const catColor = CATEGORY_COLORS[task.category] ?? "#6b7280";
 
   function handleRun(e: React.MouseEvent) {
     e.stopPropagation();
@@ -254,6 +329,7 @@ function TaskRow({
         className="grid items-center px-4 py-2.5"
         style={{ gridTemplateColumns: "1fr 130px 160px 110px 110px 60px 80px" }}
       >
+        {/* Name */}
         <div className="flex items-center gap-2 min-w-0">
           <span
             className={`shrink-0 rounded-full ${statusColor}`}
@@ -271,31 +347,33 @@ function TaskRow({
             )}
           </div>
         </div>
+
+        {/* Category */}
         <div>
-          <span
-            className="text-xs px-1.5 py-0.5 rounded"
-            style={{
-              backgroundColor: `${catColor}20`,
-              color: catColor,
-              border: `1px solid ${catColor}40`,
-              fontSize: "10px",
-            }}
-          >
-            {task.category}
-          </span>
+          <CategoryBadge category={task.category} />
         </div>
+
+        {/* Schedule */}
         <span className="text-xs truncate" style={{ color: "var(--text-muted)", fontSize: "11px" }}>
           {task.cronExpression ? task.schedule : "—"}
         </span>
+
+        {/* Last run */}
         <span suppressHydrationWarning className="text-xs" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
           {task.lastRunAt ? relativeTime(task.lastRunAt) : "Never"}
         </span>
+
+        {/* Next run */}
         <span suppressHydrationWarning className="text-xs" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
           {task.nextRunAt ? relativeTime(task.nextRunAt) : "—"}
         </span>
+
+        {/* Digest count */}
         <span className="text-xs tabular-nums" style={{ color: "var(--text-faint)", fontSize: "11px" }}>
           {task.digestCount > 0 ? task.digestCount : "—"}
         </span>
+
+        {/* Actions */}
         <div className="flex justify-end">
           {!task.cronExpression && (
             <button
@@ -324,6 +402,8 @@ function TaskRow({
     </div>
   );
 }
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();

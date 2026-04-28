@@ -1,18 +1,11 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import type { TaskWithDigests } from "@/lib/types";
+import type { TaskWithDigests, DigestFile } from "@/lib/types";
 import { getRunStatus, getStatusColor, getStatusLabel } from "@/lib/runStatus";
 import { runTaskNow } from "@/lib/actions";
 import { DigestReader } from "./DigestReader";
-
-const CATEGORY_COLORS: Record<string, string> = {
-  "AI & Tech": "#a78bfa",
-  "Arts & Entertainment": "#f59e0b",
-  "VC Investing": "#34d399",
-  Ventures: "#60a5fa",
-  "Events & Research": "#f87171",
-};
+import { CategoryBadge } from "./CategoryBadge";
 
 interface TaskDetailPanelProps {
   task: TaskWithDigests;
@@ -27,7 +20,6 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const status = getRunStatus(task);
   const statusColor = getStatusColor(status);
   const statusLabel = getStatusLabel(status);
-  const catColor = CATEGORY_COLORS[task.category] ?? "#6b7280";
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -45,12 +37,18 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   }
 
   if (openDigestId) {
-    return <DigestReader digestId={openDigestId} onClose={() => setOpenDigestId(null)} />;
+    return (
+      <DigestReader
+        digestId={openDigestId}
+        allDigestIds={task.recentDigests.map((d) => d.id)}
+        onClose={() => setOpenDigestId(null)}
+      />
+    );
   }
 
   const panelContent = (
     <>
-      {/* Panel header */}
+      {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 shrink-0"
         style={{ borderBottom: "1px solid var(--border)" }}
@@ -61,20 +59,15 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         <button
           onClick={onClose}
           className="flex items-center justify-center rounded text-xs"
-          style={{
-            width: 28,
-            height: 28,
-            color: "var(--text-muted)",
-            border: "1px solid var(--border)",
-          }}
+          style={{ width: 28, height: 28, color: "var(--text-muted)", border: "1px solid var(--border)" }}
         >
           ✕
         </button>
       </div>
 
-      {/* Panel content */}
+      {/* Body */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-        {/* Task name + status */}
+        {/* Name + status */}
         <div className="flex flex-col gap-1.5">
           <h2 className="text-sm font-semibold leading-tight" style={{ color: "#fff" }}>
             {task.name}
@@ -87,16 +80,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
               {statusLabel}
             </span>
-            <span
-              className="text-xs px-1.5 py-0.5 rounded"
-              style={{
-                backgroundColor: `${catColor}20`,
-                color: catColor,
-                border: `1px solid ${catColor}40`,
-              }}
-            >
-              {task.category}
-            </span>
+            <CategoryBadge category={task.category} />
           </div>
         </div>
 
@@ -105,7 +89,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
           {task.description}
         </p>
 
-        {/* Metadata rows */}
+        {/* Metadata */}
         <div
           className="rounded-lg p-3 flex flex-col gap-2"
           style={{ backgroundColor: "var(--surface-raised)", border: "1px solid var(--border)" }}
@@ -116,17 +100,26 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
           <MetaRow label="Digests" value={String(task.digestCount)} />
         </div>
 
-        {/* Run Now button */}
+        {/* 7-day activity sparkline */}
+        {task.recentDigests.length > 0 && (
+          <div>
+            <p
+              className="text-xs font-medium mb-2 uppercase tracking-widest"
+              style={{ color: "var(--text-faint)", fontSize: "10px" }}
+            >
+              7-Day Activity
+            </p>
+            <ActivitySparkline recentDigests={task.recentDigests} />
+          </div>
+        )}
+
+        {/* Run Now */}
         <div>
           <button
             onClick={handleRunNow}
             disabled={isPending}
             className="w-full py-2 px-3 rounded-md text-xs font-medium"
-            style={{
-              backgroundColor: "var(--accent)",
-              color: "#fff",
-              opacity: isPending ? 0.6 : 1,
-            }}
+            style={{ backgroundColor: "var(--accent)", color: "#fff", opacity: isPending ? 0.6 : 1 }}
           >
             {isPending ? "Running…" : "Run Now"}
           </button>
@@ -151,7 +144,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
                 <button
                   key={d.id}
                   onClick={() => setOpenDigestId(d.id)}
-                  className="w-full text-left rounded-lg p-2.5 flex flex-col gap-0.5"
+                  className="w-full text-left rounded-lg p-2.5 flex flex-col gap-0.5 transition-colors hover:brightness-110"
                   style={{
                     backgroundColor: "var(--surface-raised)",
                     border: "1px solid var(--border-subtle)",
@@ -162,17 +155,11 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
                       {d.fileName}
                     </span>
                     <span className="text-xs shrink-0" style={{ color: "var(--text-faint)" }}>
-                      {new Date(d.date).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {new Date(d.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     </span>
                   </div>
                   {d.preview && (
-                    <p
-                      className="text-xs line-clamp-2 leading-relaxed"
-                      style={{ color: "var(--text-muted)" }}
-                    >
+                    <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: "var(--text-muted)" }}>
                       {d.preview}
                     </p>
                   )}
@@ -187,12 +174,13 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
 
   return (
     <>
-      {/* Mobile: backdrop + bottom sheet — each a separate fixed root, no nesting */}
+      {/* Mobile backdrop */}
       <div
         className="md:hidden fixed inset-0 z-40"
-        style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+        style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
         onClick={onClose}
       />
+      {/* Mobile bottom sheet */}
       <div
         className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex flex-col rounded-t-xl overflow-hidden"
         style={{
@@ -211,12 +199,13 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         {panelContent}
       </div>
 
-      {/* Desktop: backdrop + right panel — each a separate fixed root, no nesting */}
+      {/* Desktop backdrop */}
       <div
         className="hidden md:block fixed inset-0 z-40"
-        style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+        style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
         onClick={onClose}
       />
+      {/* Desktop right panel */}
       <div
         className="hidden md:flex fixed top-0 right-0 bottom-0 z-40 flex-col overflow-hidden"
         style={{
@@ -231,6 +220,68 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     </>
   );
 }
+
+// ─── ActivitySparkline ────────────────────────────────────────────────────────
+
+function ActivitySparkline({ recentDigests }: { recentDigests: DigestFile[] }) {
+  const today = new Date();
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (6 - i));
+    return d.toDateString();
+  });
+
+  const activeDays = new Set(recentDigests.map((d) => new Date(d.date).toDateString()));
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-end gap-1" style={{ height: 24 }}>
+        {days.map((day, i) => {
+          const isActive = activeDays.has(day);
+          const isToday = i === 6;
+          return (
+            <div
+              key={i}
+              title={day}
+              className="flex-1 rounded-sm"
+              style={{
+                height: isActive ? "100%" : "30%",
+                backgroundColor: isActive
+                  ? "var(--accent)"
+                  : isToday
+                  ? "rgba(94,106,210,0.2)"
+                  : "rgba(255,255,255,0.06)",
+                transition: "height 0.2s ease",
+              }}
+            />
+          );
+        })}
+      </div>
+      {/* Day labels */}
+      <div className="flex items-center gap-1">
+        {days.map((day, i) => {
+          const isToday = i === 6;
+          const label = new Date(day).toLocaleDateString("en-US", { weekday: "narrow" });
+          return (
+            <div
+              key={i}
+              className="flex-1 text-center"
+              style={{
+                fontSize: "9px",
+                color: isToday ? "var(--accent)" : "var(--text-faint)",
+                fontWeight: isToday ? 600 : 400,
+              }}
+            >
+              {label}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
