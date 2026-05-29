@@ -53,7 +53,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         className="flex items-center justify-between px-4 py-3 shrink-0"
         style={{ borderBottom: "1px solid var(--border)" }}
       >
-        <span className="text-xs font-medium" style={{ color: "#fff" }}>
+        <span className="text-xs font-semibold" style={{ color: "var(--text-strong)" }}>
           Task Detail
         </span>
         <button
@@ -69,7 +69,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
         {/* Name + status */}
         <div className="flex flex-col gap-1.5">
-          <h2 className="text-sm font-semibold leading-tight" style={{ color: "#fff" }}>
+          <h2 className="text-sm font-semibold leading-tight" style={{ color: "var(--text-strong)" }}>
             {task.name}
           </h2>
           <div className="flex items-center flex-wrap gap-2">
@@ -151,7 +151,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
                   }}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium truncate" style={{ color: "#fff" }}>
+                    <span className="text-xs font-medium truncate" style={{ color: "var(--text-strong)" }}>
                       {d.fileName}
                     </span>
                     <span className="text-xs shrink-0" style={{ color: "var(--text-faint)" }}>
@@ -177,7 +177,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
       {/* Mobile backdrop */}
       <div
         className="md:hidden fixed inset-0 z-40"
-        style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+        style={{ backgroundColor: "rgba(30,26,20,0.35)" }}
         onClick={onClose}
       />
       {/* Mobile bottom sheet */}
@@ -187,13 +187,13 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
           maxHeight: "82vh",
           backgroundColor: "var(--surface)",
           borderTop: "1px solid var(--border)",
-          boxShadow: "0 -16px 40px rgba(0,0,0,0.4)",
+          boxShadow: "0 -16px 40px rgba(30,26,20,0.16)",
         }}
       >
         <div className="flex justify-center pt-2 pb-1 shrink-0">
           <div
             className="rounded-full"
-            style={{ width: 32, height: 4, backgroundColor: "rgba(255,255,255,0.15)" }}
+            style={{ width: 32, height: 4, backgroundColor: "var(--border)" }}
           />
         </div>
         {panelContent}
@@ -202,7 +202,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
       {/* Desktop backdrop */}
       <div
         className="hidden md:block fixed inset-0 z-40"
-        style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+        style={{ backgroundColor: "rgba(30,26,20,0.35)" }}
         onClick={onClose}
       />
       {/* Desktop right panel */}
@@ -212,7 +212,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
           width: 360,
           backgroundColor: "var(--surface)",
           borderLeft: "1px solid var(--border)",
-          boxShadow: "-16px 0 40px rgba(0,0,0,0.4)",
+          boxShadow: "-16px 0 40px rgba(30,26,20,0.16)",
         }}
       >
         {panelContent}
@@ -249,8 +249,8 @@ function ActivitySparkline({ recentDigests }: { recentDigests: DigestFile[] }) {
                 backgroundColor: isActive
                   ? "var(--accent)"
                   : isToday
-                  ? "rgba(94,106,210,0.2)"
-                  : "rgba(255,255,255,0.06)",
+                  ? "var(--accent-soft)"
+                  : "var(--surface-sunken)",
                 transition: "height 0.2s ease",
               }}
             />

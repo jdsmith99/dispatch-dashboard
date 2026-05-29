@@ -40,7 +40,7 @@ export function Sidebar({ categoryCounts, totalCount }: SidebarProps) {
         style={{ borderBottom: "1px solid var(--border)" }}
       >
         <DispatchIcon />
-        <span className="font-semibold text-sm tracking-tight" style={{ color: "#fff" }}>
+        <span className="font-semibold text-sm tracking-tight" style={{ color: "var(--text-strong)" }}>
           Dispatch
         </span>
       </div>
@@ -55,8 +55,8 @@ export function Sidebar({ categoryCounts, totalCount }: SidebarProps) {
               href={href}
               className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
               style={{
-                color: active ? "#fff" : "var(--text-muted)",
-                backgroundColor: active ? "rgba(255,255,255,0.07)" : "transparent",
+                color: active ? "var(--accent)" : "var(--text-muted)",
+                backgroundColor: active ? "var(--accent-soft)" : "transparent",
               }}
             >
               <Icon size={14} />

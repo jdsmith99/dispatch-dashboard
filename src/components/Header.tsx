@@ -34,7 +34,7 @@ export function Header() {
           backgroundColor: "var(--surface)",
         }}
       >
-        <span className="text-sm font-medium" style={{ color: "#fff" }}>
+        <span className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-strong)" }}>
           {title}
         </span>
 
@@ -44,7 +44,7 @@ export function Header() {
             className="flex items-center gap-1.5 px-2 md:px-2.5 py-1.5 rounded-md text-xs transition-colors"
             style={{ color: "var(--text-muted)", backgroundColor: "transparent" }}
             onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)")
+              (e.currentTarget.style.backgroundColor = "var(--hover)")
             }
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             title="Search digests"
@@ -64,7 +64,7 @@ export function Header() {
               backgroundColor: "transparent",
             }}
             onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)")
+              (e.currentTarget.style.backgroundColor = "var(--hover)")
             }
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             title="Refresh data"

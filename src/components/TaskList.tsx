@@ -186,8 +186,8 @@ function Section({
             className="flex items-center gap-0.5 px-2 py-0.5 rounded text-xs"
             style={{
               fontSize: "10px",
-              color: sortKey === key ? "#fff" : "var(--text-faint)",
-              backgroundColor: sortKey === key ? "rgba(255,255,255,0.08)" : "transparent",
+              color: sortKey === key ? "var(--text-strong)" : "var(--text-faint)",
+              backgroundColor: sortKey === key ? "var(--active)" : "transparent",
               border: "1px solid var(--border)",
             }}
           >
@@ -253,7 +253,7 @@ function TaskCard({ task, onClick }: { task: TaskWithDigests; onClick: () => voi
             style={{ width: 7, height: 7 }}
             title={statusLabel}
           />
-          <span className="text-xs font-medium truncate" style={{ color: "#fff" }}>
+          <span className="text-xs font-medium truncate" style={{ color: "var(--text-strong)" }}>
             {task.name}
           </span>
         </div>
@@ -337,7 +337,7 @@ function TaskRow({ task, last, onClick }: { task: TaskWithDigests; last: boolean
             title={getStatusLabel(status)}
           />
           <div className="min-w-0">
-            <p className="text-xs font-medium truncate" style={{ color: "#fff" }}>
+            <p className="text-xs font-medium truncate" style={{ color: "var(--text-strong)" }}>
               {task.name}
             </p>
             {runMsg && (
@@ -386,8 +386,8 @@ function TaskRow({ task, last, onClick }: { task: TaskWithDigests; last: boolean
                 opacity: isPending ? 0.5 : 1,
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.25)";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-strong)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--text-faint)";
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";

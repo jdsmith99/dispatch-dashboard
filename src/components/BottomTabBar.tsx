@@ -28,7 +28,7 @@ export function BottomTabBar() {
             key={href}
             href={href}
             className="flex flex-col items-center justify-center flex-1 gap-1 transition-colors"
-            style={{ color: active ? "#fff" : "var(--text-faint)" }}
+            style={{ color: active ? "var(--accent)" : "var(--text-faint)" }}
           >
             <Icon size={18} active={active} />
             <span style={{ fontSize: 10, fontWeight: active ? 600 : 400 }}>{label}</span>

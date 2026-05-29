@@ -15,7 +15,7 @@ export function SummaryBar({ stats }: { stats: Stat[] }) {
     >
       {stats.map((s) => (
         <div key={s.label} className="flex items-baseline gap-1.5">
-          <span className="text-sm font-semibold tabular-nums" style={{ color: "#fff" }}>
+          <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--text-strong)" }}>
             {s.value}
           </span>
           <span className="text-xs" style={{ color: "var(--text-faint)" }}>

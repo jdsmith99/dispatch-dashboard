@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { DigestWithContent } from "@/lib/types";
@@ -10,6 +10,8 @@ interface DigestReaderProps {
   digestId: string;
   /** Full ordered list of IDs — enables prev/next navigation */
   allDigestIds?: string[];
+  /** Called with each digest id as it's viewed (initial open + prev/next nav). */
+  onView?: (id: string) => void;
   onClose: () => void;
 }
 
@@ -17,29 +19,38 @@ function estimateReadTime(content: string): number {
   return Math.max(1, Math.round(content.split(/\s+/).filter(Boolean).length / 200));
 }
 
-export function DigestReader({ digestId, allDigestIds, onClose }: DigestReaderProps) {
+export function DigestReader({ digestId, allDigestIds, onView, onClose }: DigestReaderProps) {
   const [currentId, setCurrentId] = useState(digestId);
   const [digest, setDigest] = useState<DigestWithContent | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const ids = allDigestIds ?? [digestId];
+  const ids = useMemo(() => allDigestIds ?? [digestId], [allDigestIds, digestId]);
   const currentIndex = ids.indexOf(currentId);
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < ids.length - 1;
 
   useEffect(() => {
-    setDigest(null);
-    setError(null);
+    onView?.(currentId);
     startTransition(async () => {
+      setError(null);
       try {
         const data = await getDigestContentAction(currentId);
-        setDigest(data);
+        if (data) setDigest(data);
+        else setError("Digest not found");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load");
       }
     });
-  }, [currentId]);
+  }, [currentId, onView]);
+
+  // We don't null `digest` before each load (that'd be a setState-in-effect);
+  // instead we derive freshness. `digest` is stale until its id matches the one
+  // we're viewing, so a navigation shows the skeleton rather than old content.
+  const isCurrent = digest?.id === currentId;
+  const ready = isCurrent && !isPending && !error;
+  const showError = !!error && !isPending;
+  const showSkeleton = !ready && !showError;
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -51,7 +62,7 @@ export function DigestReader({ digestId, allDigestIds, onClose }: DigestReaderPr
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose, hasPrev, hasNext, currentIndex, ids]);
 
-  const readTime = digest ? estimateReadTime(digest.content) : null;
+  const readTime = isCurrent && digest ? estimateReadTime(digest.content) : null;
 
   const header = (
     <div
@@ -98,9 +109,9 @@ export function DigestReader({ digestId, allDigestIds, onClose }: DigestReaderPr
 
       {/* Title */}
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-        {digest ? (
+        {ready && digest ? (
           <>
-            <span className="text-sm font-medium truncate" style={{ color: "#fff" }}>
+            <span className="text-base font-semibold truncate" style={{ color: "var(--text-strong)", fontFamily: "var(--font-serif)" }}>
               {digest.taskName}
             </span>
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -138,7 +149,7 @@ export function DigestReader({ digestId, allDigestIds, onClose }: DigestReaderPr
 
   const body = (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
-      {isPending && (
+      {showSkeleton && (
         <div className="flex flex-col gap-3 pt-1">
           {[100, 82, 91, 66, 87, 73, 95, 78].map((w, i) => (
             <div key={i} className="skeleton rounded" style={{ height: 13, width: `${w}%` }} />
@@ -150,8 +161,8 @@ export function DigestReader({ digestId, allDigestIds, onClose }: DigestReaderPr
           </div>
         </div>
       )}
-      {error && <div className="text-xs text-red-400">{error}</div>}
-      {digest && !isPending && (
+      {showError && <div className="text-xs text-red-400">{error}</div>}
+      {ready && digest && (
         <div className="prose">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{digest.content}</ReactMarkdown>
         </div>
@@ -173,7 +184,7 @@ export function DigestReader({ digestId, allDigestIds, onClose }: DigestReaderPr
       {/* Desktop: backdrop + centered modal */}
       <div
         className="hidden md:flex fixed inset-0 z-50 items-center justify-center p-4"
-        style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+        style={{ backgroundColor: "rgba(30,26,20,0.35)" }}
         onClick={(e) => e.target === e.currentTarget && onClose()}
       >
         <div
@@ -181,7 +192,7 @@ export function DigestReader({ digestId, allDigestIds, onClose }: DigestReaderPr
           style={{
             backgroundColor: "var(--surface-raised)",
             border: "1px solid var(--border)",
-            boxShadow: "0 32px 80px rgba(0,0,0,0.6)",
+            boxShadow: "var(--shadow-lg)",
             maxHeight: "85vh",
           }}
         >

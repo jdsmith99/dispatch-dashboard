@@ -2,97 +2,141 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Light "paper" theme ─────────────────────────────────────────────────────
+   Warm paper background, dark ink text, indigo accent. Semantic tokens so the
+   whole UI can be re-themed from here. --text-strong is the ink used for
+   primary text (replaces the old hardcoded #fff). */
 :root {
-  --bg: #0f0f10;
-  --surface: #161618;
-  --surface-raised: #1c1c1f;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.05);
-  --text: #e2e2e5;
-  --text-muted: #7c7c8a;
-  --text-faint: #4a4a56;
-  --accent: #5e6ad2;
-  --accent-hover: #6b78e5;
+  --bg: #f7f5f1;             /* warm paper */
+  --surface: #ffffff;        /* cards, header, sidebar */
+  --surface-raised: #ffffff; /* modals, panels */
+  --surface-sunken: #f1efe9; /* subtle insets */
+
+  --border: rgba(30, 26, 20, 0.12);
+  --border-subtle: rgba(30, 26, 20, 0.07);
+
+  --text-strong: #1c1a17;    /* headings / primary (ink) */
+  --text: #34302a;           /* body */
+  --text-muted: #6f6a61;     /* secondary */
+  --text-faint: #a39d92;     /* tertiary / labels */
+
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: rgba(79, 70, 229, 0.10);
+
+  --hover: rgba(30, 26, 20, 0.04);
+  --active: rgba(30, 26, 20, 0.07);
+
+  --shadow-md: 0 4px 16px rgba(30, 26, 20, 0.08);
+  --shadow-lg: 0 16px 48px rgba(30, 26, 20, 0.16);
+
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: var(--font-source-serif), Georgia, "Iowan Old Style", "Times New Roman", serif;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   background-color: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+::selection { background: var(--accent-soft); }
 
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(30, 26, 20, 0.18); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(30, 26, 20, 0.3); }
+
+/* ── Reading surface: serif digest body ──────────────────────────────────── */
 .prose {
   color: var(--text);
-  max-width: none;
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;   /* 17px */
+  line-height: 1.75;
+  max-width: 65ch;
+  margin: 0 auto;
 }
-.prose h1, .prose h2, .prose h3 {
-  color: #fff;
+.prose > :first-child { margin-top: 0; }
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  color: var(--text-strong);
+  font-family: var(--font-serif);
   font-weight: 600;
-  margin-top: 1.5em;
+  line-height: 1.25;
+  margin-top: 1.6em;
   margin-bottom: 0.5em;
+  letter-spacing: -0.01em;
 }
-.prose h1 { font-size: 1.25rem; }
-.prose h2 { font-size: 1.1rem; }
-.prose h3 { font-size: 1rem; }
-.prose p { margin-bottom: 0.75em; }
-.prose ul, .prose ol { padding-left: 1.5em; margin-bottom: 0.75em; }
-.prose li { margin-bottom: 0.25em; }
+.prose h1 { font-size: 1.6rem; }
+.prose h2 { font-size: 1.3rem; }
+.prose h3 { font-size: 1.12rem; }
+.prose p { margin-bottom: 0.9em; }
+.prose ul, .prose ol { padding-left: 1.4em; margin-bottom: 0.9em; }
+.prose li { margin-bottom: 0.35em; }
+.prose li::marker { color: var(--text-faint); }
 .prose code {
-  background: rgba(255,255,255,0.08);
-  padding: 0.1em 0.35em;
-  border-radius: 3px;
-  font-size: 0.85em;
-  font-family: "SF Mono", "Fira Code", monospace;
+  background: var(--surface-sunken);
+  padding: 0.12em 0.4em;
+  border-radius: 4px;
+  font-size: 0.82em;
+  font-family: "SF Mono", "Fira Code", ui-monospace, monospace;
+  color: var(--text-strong);
 }
 .prose pre {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 1em;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 1em 1.1em;
   overflow-x: auto;
-  margin-bottom: 1em;
+  margin-bottom: 1.1em;
+  font-size: 0.9rem;
+  line-height: 1.55;
 }
-.prose pre code { background: none; padding: 0; }
+.prose pre code { background: none; padding: 0; font-size: inherit; }
 .prose blockquote {
-  border-left: 3px solid var(--border);
+  border-left: 3px solid var(--accent);
   padding-left: 1em;
   color: var(--text-muted);
-  margin: 0.75em 0;
+  font-style: italic;
+  margin: 1em 0;
 }
-.prose a { color: var(--accent); text-decoration: none; }
-.prose a:hover { text-decoration: underline; }
-.prose strong { color: #fff; font-weight: 600; }
-.prose hr { border-color: var(--border); margin: 1.5em 0; }
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.65; }
+.prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(79, 70, 229, 0.35);
 }
-.skeleton {
-  background: rgba(255,255,255,0.08);
-  animation: skeleton-pulse 1.4s ease-in-out infinite;
-}
+.prose a:hover { text-decoration-color: var(--accent); }
+.prose strong { color: var(--text-strong); font-weight: 700; }
+.prose hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
 
-.prose table { width: 100%; border-collapse: collapse; margin-bottom: 1em; }
+.prose table { width: 100%; border-collapse: collapse; margin-bottom: 1.1em; font-size: 0.95rem; }
 .prose th {
   text-align: left;
-  padding: 0.4em 0.75em;
+  padding: 0.5em 0.75em;
   border-bottom: 1px solid var(--border);
   color: var(--text-muted);
-  font-weight: 500;
-  font-size: 0.8rem;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-.prose td { padding: 0.4em 0.75em; border-bottom: 1px solid var(--border-subtle); }
+.prose td { padding: 0.5em 0.75em; border-bottom: 1px solid var(--border-subtle); }
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.85; }
+}
+.skeleton {
+  background: var(--surface-sunken);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}

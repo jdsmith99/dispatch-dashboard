@@ -18,10 +18,13 @@ export function SearchModal({ onClose }: SearchModalProps) {
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Reset focus when results change
-  useEffect(() => {
+  // Reset focus when the results set changes — adjusted during render (no effect)
+  // per https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [prevResults, setPrevResults] = useState(results);
+  if (prevResults !== results) {
+    setPrevResults(results);
     setFocusedIndex(-1);
-  }, [results]);
+  }
 
   // Scroll focused item into view
   useEffect(() => {
@@ -80,7 +83,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-24"
-      style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+      style={{ backgroundColor: "rgba(30,26,20,0.35)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -88,7 +91,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
         style={{
           backgroundColor: "var(--surface-raised)",
           border: "1px solid var(--border)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+          boxShadow: "var(--shadow-lg)",
         }}
       >
         {/* Search input row */}
@@ -147,12 +150,12 @@ export function SearchModal({ onClose }: SearchModalProps) {
                 className="w-full text-left px-4 py-3 flex flex-col gap-1 transition-colors"
                 style={{
                   borderBottom: "1px solid var(--border-subtle)",
-                  backgroundColor: focused ? "rgba(94,106,210,0.1)" : "transparent",
+                  backgroundColor: focused ? "var(--accent-soft)" : "transparent",
                 }}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-medium truncate" style={{ color: "#fff" }}>
+                    <span className="text-sm font-medium truncate" style={{ color: "var(--text-strong)", fontFamily: "var(--font-serif)" }}>
                       {r.taskName}
                     </span>
                     <CategoryBadge category={r.category} />

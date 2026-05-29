@@ -1,177 +1,76 @@
-import path from "path";
-import fs from "fs";
+import "server-only";
+import { getDb } from "./db";
 import type { Category, DigestFile, DigestWithContent } from "./types";
-import { loadTaskConfigs } from "./tasks";
 
-function toBase64UrlId(filePath: string): string {
-  return Buffer.from(filePath).toString("base64url");
-}
+// Columns that make up a DigestFile (no content — kept lean for list views).
+const DIGEST_COLS =
+  "id, file_name, file_path, task_id, task_name, category, digest_date, preview";
 
-function fromBase64UrlId(id: string): string {
-  return Buffer.from(id, "base64url").toString("utf-8");
-}
-
-export async function scanFolderForDigests(
-  folder: string,
-  taskId: string,
-  taskName: string,
-  category: Category,
-  filePattern: string
-): Promise<DigestFile[]> {
-  const normalizedFolder = path.resolve(folder);
-
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(normalizedFolder, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-
-  const files: DigestFile[] = [];
-
-  for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
-    if (filePattern !== "*.md" && !matchesPattern(entry.name, filePattern)) continue;
-
-    const filePath = path.join(normalizedFolder, entry.name);
-    let stat: fs.Stats;
-    try {
-      stat = fs.statSync(filePath);
-    } catch {
-      continue;
-    }
-
-    let preview = "";
-    try {
-      const handle = fs.openSync(filePath, "r");
-      const buf = Buffer.alloc(512);
-      fs.readSync(handle, buf, 0, 512, 0);
-      fs.closeSync(handle);
-      const raw = buf.toString("utf-8").replace(/\0/g, "");
-      preview = raw.replace(/^#.*\n?/m, "").replace(/[#*`_\[\]]/g, "").trim().slice(0, 150);
-    } catch {
-      // locked file — skip preview
-    }
-
-    files.push({
-      id: toBase64UrlId(filePath),
-      fileName: entry.name,
-      filePath,
-      taskId,
-      taskName,
-      category,
-      date: stat.mtime.toISOString(),
-      preview,
-    });
-  }
-
-  files.sort((a, b) => b.date.localeCompare(a.date));
-  return files;
-}
-
-export async function getAllDigests(categoryFilter?: Category): Promise<DigestFile[]> {
-  const configs = loadTaskConfigs();
-  const all: DigestFile[] = [];
-
-  for (const task of configs) {
-    if (!task.outputFolder) continue;
-    try {
-      const digests = await scanFolderForDigests(
-        task.outputFolder,
-        task.id,
-        task.name,
-        task.category as Category,
-        task.filePattern ?? "*.md"
-      );
-      all.push(...digests);
-    } catch {
-      // skip
-    }
-  }
-
-  const unique = deduplicateByPath(all);
-  const filtered = categoryFilter
-    ? unique.filter((d) => d.category === categoryFilter)
-    : unique;
-
-  filtered.sort((a, b) => b.date.localeCompare(a.date));
-  return filtered;
-}
-
-function matchesPattern(name: string, pattern: string): boolean {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
-  return new RegExp(`^${escaped}$`).test(name);
-}
-
-function deduplicateByPath(digests: DigestFile[]): DigestFile[] {
-  const seen = new Set<string>();
-  return digests.filter((d) => {
-    if (seen.has(d.filePath)) return false;
-    seen.add(d.filePath);
-    return true;
-  });
-}
-
-export async function getDigestContent(id: string): Promise<DigestWithContent | null> {
-  const filePath = fromBase64UrlId(id);
-  const configs = loadTaskConfigs();
-
-  let content = "";
-  try {
-    content = fs.readFileSync(filePath, "utf-8");
-  } catch {
-    return null;
-  }
-
-  let stat: fs.Stats;
-  try {
-    stat = fs.statSync(filePath);
-  } catch {
-    return null;
-  }
-
-  const fileName = path.basename(filePath);
-  const folder = path.dirname(filePath);
-  const fileNameLower = fileName.toLowerCase();
-
-  // Match by outputFolder first, then fall back to filePrefix
-  const matchedTask =
-    configs.find((t) => t.outputFolder && path.resolve(t.outputFolder) === folder) ??
-    configs.find(
-      (t) =>
-        t.filePrefix &&
-        fileNameLower.startsWith(t.filePrefix.toLowerCase() + "-")
-    );
-
+function rowToDigest(row: Record<string, unknown>): DigestFile {
   return {
-    id,
-    fileName,
-    filePath,
-    taskId: matchedTask?.id ?? "unknown",
-    taskName: matchedTask?.name ?? fileName,
-    category: (matchedTask?.category as Category) ?? "AI & Tech",
-    date: stat.mtime.toISOString(),
-    preview: content.slice(0, 150),
-    content,
+    id: row.id as string,
+    fileName: row.file_name as string,
+    filePath: row.file_path as string,
+    taskId: row.task_id as string,
+    taskName: row.task_name as string,
+    category: row.category as Category,
+    date: row.digest_date as string,
+    preview: row.preview as string,
   };
 }
 
+export async function getAllDigests(categoryFilter?: Category): Promise<DigestFile[]> {
+  const db = getDb();
+  const result = categoryFilter
+    ? await db.execute({
+        sql: `SELECT ${DIGEST_COLS} FROM digests WHERE category = ? ORDER BY digest_date DESC`,
+        args: [categoryFilter],
+      })
+    : await db.execute(`SELECT ${DIGEST_COLS} FROM digests ORDER BY digest_date DESC`);
+  return result.rows.map(rowToDigest);
+}
+
+export async function getDigestContent(id: string): Promise<DigestWithContent | null> {
+  const db = getDb();
+  const result = await db.execute({
+    sql: `SELECT ${DIGEST_COLS}, content FROM digests WHERE id = ?`,
+    args: [id],
+  });
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  return { ...rowToDigest(row), content: row.content as string };
+}
+
+/** IDs of every digest the user has opened at least once (cross-device read
+ *  state, keyed by digest id). The feed treats any digest NOT in this set as
+ *  unread. Small result set — one short id per opened digest. */
+export async function getReadDigestIds(): Promise<string[]> {
+  const db = getDb();
+  const result = await db.execute(`SELECT digest_id FROM read_state`);
+  return result.rows.map((row) => row.digest_id as string);
+}
+
 export async function searchDigests(query: string): Promise<DigestFile[]> {
-  if (!query.trim()) return [];
-  const all = await getAllDigests();
-  const lower = query.toLowerCase();
-  const results: DigestFile[] = [];
+  // Tokenize on whitespace; quoting each term neutralises FTS5 syntax chars,
+  // and a trailing "*" makes each a prefix match for typeahead-style search.
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .map((t) => t.replace(/"/g, ""))
+    .filter(Boolean);
+  if (terms.length === 0) return [];
+  const match = terms.map((t) => `"${t}"*`).join(" ");
 
-  for (const digest of all) {
-    try {
-      const content = fs.readFileSync(digest.filePath, "utf-8");
-      if (content.toLowerCase().includes(lower)) {
-        results.push(digest);
-      }
-    } catch {
-      // locked or gone
-    }
-  }
-
-  return results;
+  const db = getDb();
+  const result = await db.execute({
+    sql: `SELECT d.id, d.file_name, d.file_path, d.task_id, d.task_name,
+                 d.category, d.digest_date, d.preview
+          FROM digests_fts f
+          JOIN digests d ON d.rowid = f.rowid
+          WHERE digests_fts MATCH ?
+          ORDER BY rank
+          LIMIT 100`,
+    args: [match],
+  });
+  return result.rows.map(rowToDigest);
 }

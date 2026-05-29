@@ -1,9 +1,22 @@
 import type { Metadata } from "next";
+import { Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { loadTaskConfigs, getCategoryCounts } from "@/lib/tasks";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const sourceSerif = Source_Serif_4({
+  subsets: ["latin"],
+  variable: "--font-source-serif",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Dispatch",
@@ -19,7 +32,7 @@ export default function RootLayout({
   const categoryCounts = getCategoryCounts(tasks);
 
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className={`h-full ${inter.variable} ${sourceSerif.variable}`}>
       <body
         className="h-full flex overflow-hidden"
         style={{ backgroundColor: "var(--bg)", color: "var(--text)" }}

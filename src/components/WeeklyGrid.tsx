@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TaskWithDigests } from "@/lib/types";
-import { getRunStatus, getStatusColor, getStatusLabel } from "@/lib/runStatus";
+import { getRunStatus, getStatusColor } from "@/lib/runStatus";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -131,7 +131,7 @@ export function WeeklyGrid({ tasks }: WeeklyGridProps) {
                 style={{
                   borderRight: idx < 6 ? "1px solid var(--border-subtle)" : undefined,
                   borderLeft: isToday ? "2px solid var(--accent)" : "2px solid transparent",
-                  backgroundColor: isToday ? "rgba(94,106,210,0.04)" : undefined,
+                  backgroundColor: isToday ? "var(--accent-soft)" : undefined,
                   minHeight: 80,
                 }}
               >
@@ -183,7 +183,7 @@ export function WeeklyGrid({ tasks }: WeeklyGridProps) {
                   )}
                   <span
                     className="text-xs font-semibold"
-                    style={{ color: isToday ? "#fff" : "var(--text-muted)" }}
+                    style={{ color: isToday ? "var(--text-strong)" : "var(--text-muted)" }}
                   >
                     {DAY_FULL[idx]}
                     {isToday && (
@@ -287,7 +287,7 @@ function TaskCell({ task, onClick, onInfo, compact }: TaskCellProps) {
       >
         <span className={`shrink-0 rounded-full mt-1 ${color}`} style={{ width: 6, height: 6 }} />
         <div className="min-w-0 flex-1 pr-4">
-          <p className="text-xs font-medium leading-tight truncate" style={{ color: "#e2e2e5", fontSize: "11px" }}>
+          <p className="text-xs font-medium leading-tight truncate" style={{ color: "var(--text-strong)", fontSize: "11px" }}>
             {task.name}
           </p>
           {!compact && (
@@ -305,7 +305,7 @@ function TaskCell({ task, onClick, onInfo, compact }: TaskCellProps) {
       <button
         onClick={onInfo}
         className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded"
-        style={{ width: 16, height: 16, backgroundColor: "rgba(255,255,255,0.1)", color: "var(--text-faint)" }}
+        style={{ width: 16, height: 16, backgroundColor: "var(--active)", color: "var(--text-faint)" }}
         title={`${task.name} — details`}
       >
         <InfoIcon size={9} />
@@ -338,7 +338,7 @@ function MobileTaskRow({
         className="flex-1 flex items-center gap-2.5 px-3 py-2.5 text-left min-w-0"
       >
         <span className={`shrink-0 rounded-full ${color}`} style={{ width: 7, height: 7 }} />
-        <span className="flex-1 text-xs font-medium truncate" style={{ color: "#e2e2e5" }}>
+        <span className="flex-1 text-xs font-medium truncate" style={{ color: "var(--text-strong)" }}>
           {task.name}
         </span>
         <span className="shrink-0 text-xs" style={{ color: "var(--text-faint)", fontSize: "10px" }}>

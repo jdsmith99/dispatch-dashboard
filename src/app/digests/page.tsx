@@ -1,4 +1,4 @@
-import { getAllDigests } from "@/lib/digests";
+import { getAllDigests, getReadDigestIds } from "@/lib/digests";
 import { loadTaskConfigs } from "@/lib/tasks";
 import type { Category } from "@/lib/types";
 import { DigestFeed } from "@/components/DigestFeed";
@@ -14,7 +14,10 @@ export default async function DigestsPage({ searchParams }: DigestsPageProps) {
   const params = await searchParams;
   const taskFilter = params.task;
 
-  const allDigests = await getAllDigests();
+  const [allDigests, readDigestIds] = await Promise.all([
+    getAllDigests(),
+    getReadDigestIds(),
+  ]);
   const categories = [...new Set(allDigests.map((d) => d.category))].sort() as Category[];
 
   let digests = allDigests;
@@ -37,6 +40,7 @@ export default async function DigestsPage({ searchParams }: DigestsPageProps) {
       <DigestFeed
         digests={digests}
         categories={categories}
+        readDigestIds={readDigestIds}
         activeTaskId={taskFilter}
         activeTaskName={activeTaskName}
       />

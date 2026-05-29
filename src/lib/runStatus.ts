@@ -1,5 +1,11 @@
 import type { RunStatus, TaskConfig } from "./types";
 
+/**
+ * Derives a task's run-status badge. Pure and dependency-free so it can run in
+ * client components. Relies on `lastRunAt` being the newest digest's date and
+ * `nextRunAt` being the next cron fire time (both populated server-side in
+ * loadTasksWithDigests).
+ */
 export function getRunStatus(task: TaskConfig): RunStatus {
   if (!task.cronExpression) return "manual";
 
@@ -7,48 +13,47 @@ export function getRunStatus(task: TaskConfig): RunStatus {
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
 
-  if (task.lastRunAt) {
-    const last = new Date(task.lastRunAt);
-    if (last >= todayStart) return "ran-today";
+  // Produced a digest since midnight → up to date.
+  if (task.lastRunAt && new Date(task.lastRunAt) >= todayStart) {
+    return "ran-today";
   }
 
-  if (task.nextRunAt) {
-    const next = new Date(task.nextRunAt);
-    const dayOfWeek = now.getDay(); // 0=Sun...6=Sat
-    const nextDayOfWeek = next.getDay();
-
-    // For weekly tasks: if next run is in the future (hasn't passed), it's "not-yet"
-    // If next run was supposed to happen today or earlier but didn't, it's "overdue"
-    const scheduledToday = nextDayOfWeek === dayOfWeek || isScheduledToday(task, now);
-
-    if (scheduledToday && !task.lastRunAt) return "not-yet";
-    if (next < now && !task.lastRunAt) return "overdue";
-    if (next > now) return "not-yet";
+  // Hasn't run today. If it was scheduled to run today and that time has
+  // already passed, it's overdue; otherwise it's simply still scheduled.
+  if (isScheduledToday(task.cronExpression, now)) {
+    const scheduled = scheduledTimeToday(task.cronExpression, now);
+    if (scheduled && now >= scheduled) return "overdue";
+    return "not-yet";
   }
 
   return "not-yet";
 }
 
-function isScheduledToday(task: TaskConfig, now: Date): boolean {
-  if (!task.cronExpression) return false;
-  const expr = task.cronExpression;
-  const parts = expr.split(" ");
+function isScheduledToday(cronExpression: string, now: Date): boolean {
+  const parts = cronExpression.split(" ");
   if (parts.length !== 5) return false;
-
   const [, , dom, , dow] = parts;
 
-  // Check day-of-week
   if (dow !== "*") {
     const days = dow.split(",").map(Number);
     if (!days.includes(now.getDay())) return false;
   }
-
-  // Check day-of-month
   if (dom !== "*") {
-    if (parseInt(dom) !== now.getDate()) return false;
+    if (parseInt(dom, 10) !== now.getDate()) return false;
   }
-
   return true;
+}
+
+/** Today's scheduled run time from simple numeric minute/hour cron fields. */
+function scheduledTimeToday(cronExpression: string, now: Date): Date | null {
+  const parts = cronExpression.split(" ");
+  if (parts.length !== 5) return null;
+  const m = parseInt(parts[0], 10);
+  const h = parseInt(parts[1], 10);
+  if (Number.isNaN(m) || Number.isNaN(h)) return null;
+  const d = new Date(now);
+  d.setHours(h, m, 0, 0);
+  return d;
 }
 
 export function getStatusColor(status: RunStatus): string {

@@ -1,50 +1,59 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import type { DigestFile, Category } from "@/lib/types";
 import { DigestReader } from "./DigestReader";
 import { CategoryBadge, CATEGORY_COLORS } from "./CategoryBadge";
-import { runTaskNow } from "@/lib/actions";
+import { runTaskNow, markDigestRead } from "@/lib/actions";
 
 const PAGE_SIZE = 50;
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
-/** Returns the ISO timestamp of the last time the user visited the page.
- *  Updates the stored value on each mount so current digests become "seen"
- *  on the next visit. Returns null on first visit (nothing is "new" yet). */
-function useUnreadCutoff(): string | null {
-  const [cutoff, setCutoff] = useState<string | null>(null);
-  useEffect(() => {
-    try {
-      const prev = localStorage.getItem("dispatch_last_seen");
-      setCutoff(prev);
-      localStorage.setItem("dispatch_last_seen", new Date().toISOString());
-    } catch {
-      // localStorage unavailable (private browsing, etc.) — silently skip
-    }
-  }, []);
-  return cutoff;
+/** Subscribe that never fires — for snapshots that only change within the same
+ *  render pass (no external source to listen to). */
+const noopSubscribe = () => () => {};
+
+/** False during SSR + first hydration render, true afterwards. Lets us defer
+ *  client-only rendering without a setState-in-effect. */
+function useIsClient(): boolean {
+  return useSyncExternalStore(noopSubscribe, () => true, () => false);
 }
 
-/** Persists the selected category filter across page refreshes via sessionStorage. */
+const CAT_KEY = "dispatch_cat";
+const catListeners = new Set<() => void>();
+
+function readStoredCategory(): Category | null {
+  try {
+    return (sessionStorage.getItem(CAT_KEY) as Category | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function subscribeCategory(onChange: () => void): () => void {
+  catListeners.add(onChange);
+  return () => {
+    catListeners.delete(onChange);
+  };
+}
+
+/** Persists the selected category filter across page refreshes via sessionStorage.
+ *  Exposed through useSyncExternalStore so the stored value is read without a
+ *  setState-in-effect; the server snapshot is always null and React reconciles to
+ *  the client value after hydration (no mismatch). */
 function usePersistentCategory(): [Category | null, (c: Category | null) => void] {
-  const [cat, setCat] = useState<Category | null>(null);
-  useEffect(() => {
+  const cat = useSyncExternalStore(subscribeCategory, readStoredCategory, () => null);
+
+  const setCategory = useCallback((c: Category | null) => {
     try {
-      const stored = sessionStorage.getItem("dispatch_cat");
-      if (stored) setCat(stored as Category);
+      if (c) sessionStorage.setItem(CAT_KEY, c);
+      else sessionStorage.removeItem(CAT_KEY);
     } catch {}
+    catListeners.forEach((l) => l());
   }, []);
 
-  function setCategory(c: Category | null) {
-    setCat(c);
-    try {
-      if (c) sessionStorage.setItem("dispatch_cat", c);
-      else sessionStorage.removeItem("dispatch_cat");
-    } catch {}
-  }
   return [cat, setCategory];
 }
 
@@ -53,16 +62,47 @@ function usePersistentCategory(): [Category | null, (c: Category | null) => void
 interface DigestFeedProps {
   digests: DigestFile[];
   categories: Category[];
+  /** IDs of digests the user has already opened (cross-device read state). */
+  readDigestIds: string[];
   activeTaskId?: string;
   activeTaskName?: string;
 }
 
-export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }: DigestFeedProps) {
+export function DigestFeed({
+  digests,
+  categories,
+  readDigestIds,
+  activeTaskId,
+  activeTaskName,
+}: DigestFeedProps) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = usePersistentCategory();
   const [openDigestId, setOpenDigestId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const unreadCutoff = useUnreadCutoff();
+  // Read state is known at SSR time (passed from the server), so unread dots are
+  // deterministic on first paint — no hydration dance. We track opened digests
+  // optimistically so the dot clears instantly when a reader opens.
+  const [readIds, setReadIds] = useState<Set<string>>(() => new Set(readDigestIds));
+
+  // Stable identity (empty deps) so DigestReader's load effect can depend on it
+  // without re-running. The functional updater guards against duplicate writes;
+  // markDigestRead is idempotent regardless.
+  const markRead = useCallback((id: string) => {
+    setReadIds((prev) => {
+      if (prev.has(id)) return prev;
+      void markDigestRead(id); // optimistic + idempotent server write
+      return new Set(prev).add(id);
+    });
+  }, []);
+
+  function openDigest(id: string) {
+    setOpenDigestId(id);
+    markRead(id);
+  }
+  // Date-group labels ("Today"/"Yesterday") depend on the viewer's clock/timezone,
+  // so we render a flat list on the server + first paint and group after mount to
+  // avoid hydration mismatches.
+  const mounted = useIsClient();
 
   function handleCategorySelect(cat: Category | null) {
     setSelectedCategory(cat);
@@ -83,8 +123,7 @@ export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }
   }, {});
 
   function isNew(digest: DigestFile): boolean {
-    if (!unreadCutoff) return false;
-    return digest.date > unreadCutoff;
+    return !readIds.has(digest.id);
   }
 
   return (
@@ -100,14 +139,14 @@ export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }
               onClick={() => router.push("/digests")}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs whitespace-nowrap"
               style={{
-                backgroundColor: "rgba(94,106,210,0.15)",
-                color: "#a5b4fc",
-                border: "1px solid rgba(94,106,210,0.35)",
+                backgroundColor: "var(--accent-soft)",
+                color: "var(--accent)",
+                border: "1px solid rgba(79,70,229,0.3)",
               }}
             >
               <span
                 className="rounded-full shrink-0"
-                style={{ width: 5, height: 5, backgroundColor: "#a5b4fc" }}
+                style={{ width: 5, height: 5, backgroundColor: "var(--accent)" }}
               />
               {activeTaskName ?? activeTaskId}
               <span className="ml-0.5 opacity-60" style={{ fontSize: "10px" }}>✕</span>
@@ -135,9 +174,30 @@ export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }
         </div>
 
         {/* Digest list */}
-        <div className="flex flex-col divide-y" style={{ borderColor: "var(--border-subtle)" }}>
+        <div className="flex flex-col">
           {paginated.length === 0 ? (
             <EmptyState taskId={activeTaskId} taskName={activeTaskName} />
+          ) : mounted ? (
+            groupByDate(paginated).map((group) => (
+              <div key={group.label}>
+                <div className="px-3 md:px-5 pt-5 pb-1.5">
+                  <span
+                    className="font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--text-faint)", fontSize: "10px", letterSpacing: "0.1em" }}
+                  >
+                    {group.label}
+                  </span>
+                </div>
+                {group.items.map((digest) => (
+                  <DigestCard
+                    key={digest.id}
+                    digest={digest}
+                    isNew={isNew(digest)}
+                    onRead={() => openDigest(digest.id)}
+                  />
+                ))}
+              </div>
+            ))
           ) : (
             paginated.map((digest) => (
               <DigestCard
@@ -194,6 +254,7 @@ export function DigestFeed({ digests, categories, activeTaskId, activeTaskName }
         <DigestReader
           digestId={openDigestId}
           allDigestIds={filtered.map((d) => d.id)}
+          onView={markRead}
           onClose={() => setOpenDigestId(null)}
         />
       )}
@@ -222,11 +283,11 @@ function FilterPill({
       className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs whitespace-nowrap"
       style={{
         backgroundColor: active
-          ? color ? `${color}20` : "rgba(255,255,255,0.1)"
+          ? color ? `${color}20` : "var(--accent-soft)"
           : "transparent",
-        color: active ? (color ?? "#fff") : "var(--text-muted)",
+        color: active ? (color ?? "var(--accent)") : "var(--text-muted)",
         border: active
-          ? `1px solid ${color ? `${color}40` : "rgba(255,255,255,0.2)"}`
+          ? `1px solid ${color ? `${color}40` : "rgba(79,70,229,0.3)"}`
           : "1px solid var(--border)",
       }}
     >
@@ -241,7 +302,7 @@ function FilterPill({
         className="tabular-nums"
         style={{
           fontSize: "10px",
-          color: active ? (color ? `${color}cc` : "rgba(255,255,255,0.5)") : "var(--text-faint)",
+          color: active ? (color ? `${color}cc` : "var(--accent)") : "var(--text-faint)",
         }}
       >
         {count}
@@ -264,24 +325,29 @@ function DigestCard({
   return (
     <button
       onClick={onRead}
-      className="w-full text-left flex items-start gap-3 px-3 md:px-5 py-3.5 transition-colors hover:brightness-110"
+      className="group w-full text-left flex items-start gap-3 px-3 md:px-5 py-4 transition-colors"
       style={{
-        backgroundColor: "var(--bg)",
+        backgroundColor: "transparent",
         borderBottom: "1px solid var(--border-subtle)",
         borderLeft: isNew ? "2px solid var(--accent)" : "2px solid transparent",
         cursor: "pointer",
       }}
+      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--surface)")}
+      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
     >
-      <div className="flex flex-col gap-1 min-w-0 flex-1">
+      <div className="flex flex-col gap-1.5 min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           {isNew && (
             <span
               className="rounded-full shrink-0"
               style={{ width: 6, height: 6, backgroundColor: "var(--accent)" }}
-              title="New since last visit"
+              title="Unread"
             />
           )}
-          <span className="text-xs font-medium" style={{ color: "#fff" }}>
+          <span
+            className="font-semibold"
+            style={{ color: "var(--text-strong)", fontFamily: "var(--font-serif)", fontSize: "15px" }}
+          >
             {digest.taskName}
           </span>
           <CategoryBadge category={digest.category} />
@@ -289,22 +355,55 @@ function DigestCard({
             {new Date(digest.date).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
-              year: "numeric",
             })}
           </span>
         </div>
-        <p className="text-xs leading-relaxed line-clamp-2" style={{ color: "var(--text-muted)" }}>
+        <p
+          className="line-clamp-2"
+          style={{ color: "var(--text-muted)", fontFamily: "var(--font-serif)", fontSize: "14px", lineHeight: 1.55 }}
+        >
           {digest.preview || digest.fileName}
         </p>
       </div>
       <span
-        className="shrink-0 text-xs px-3 py-1.5 rounded-md self-start"
-        style={{ color: "var(--text-muted)", border: "1px solid var(--border)" }}
+        className="shrink-0 text-xs px-3 py-1.5 rounded-md self-center opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ color: "var(--accent)", border: "1px solid rgba(79,70,229,0.3)" }}
       >
-        Read
+        Read →
       </span>
     </button>
   );
+}
+
+// ─── Date grouping ──────────────────────────────────────────────────────────
+
+function groupByDate(digests: DigestFile[]): { label: string; items: DigestFile[] }[] {
+  const groups: { label: string; items: DigestFile[] }[] = [];
+  const byLabel = new Map<string, DigestFile[]>();
+  for (const d of digests) {
+    const label = dateGroupLabel(d.date);
+    let bucket = byLabel.get(label);
+    if (!bucket) {
+      bucket = [];
+      byLabel.set(label, bucket);
+      groups.push({ label, items: bucket });
+    }
+    bucket.push(d);
+  }
+  return groups;
+}
+
+function dateGroupLabel(iso: string): string {
+  const d = new Date(iso);
+  const day = new Date(d);
+  day.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today.getTime() - day.getTime()) / 86_400_000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays > 1 && diffDays < 7) return d.toLocaleDateString("en-US", { weekday: "long" });
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
 
 // ─── EmptyState ───────────────────────────────────────────────────────────────
@@ -326,7 +425,7 @@ function EmptyState({ taskId, taskName }: { taskId?: string; taskName?: string }
       <div className="flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
         <div
           className="rounded-full flex items-center justify-center"
-          style={{ width: 40, height: 40, backgroundColor: "rgba(255,255,255,0.05)" }}
+          style={{ width: 40, height: 40, backgroundColor: "var(--surface-sunken)" }}
         >
           <svg width="18" height="18" viewBox="0 0 16 16" fill="none" style={{ color: "var(--text-faint)" }}>
             <path d="M4 2h5l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" />
@@ -335,7 +434,7 @@ function EmptyState({ taskId, taskName }: { taskId?: string; taskName?: string }
           </svg>
         </div>
         <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium" style={{ color: "#fff" }}>
+          <p className="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
             No digests yet for {taskName ?? taskId}
           </p>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
